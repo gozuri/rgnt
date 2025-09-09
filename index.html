@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    * 09.09.2025 - 23.34 */
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Golf Stableford Rechner</title>
@@ -913,10 +912,10 @@
                 const playersCollectionRef = collection(tournamentDocRef, 'players');
                 unsubscribePlayers = onSnapshot(playersCollectionRef, (snapshot) => {
                     const loadedPlayers = [];
-                    const loadedScores = {};
                     snapshot.forEach(d => {
                         const playerData = d.data();
                         loadedPlayers.push({ id: d.id, ...d.data() });
+
                     });
 
                     players = loadedPlayers;
