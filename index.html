@@ -7,6 +7,14 @@
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, addDoc, getDocs, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        window.firebase = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, addDoc, getDocs, deleteDoc, writeBatch, setLogLevel };
+    </script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -445,31 +453,28 @@
         </div>
     </div>
 
-    <script>
-        // Global variables for data
-        let course = {
-            tournamentName: '',
-            courseName: '',
-            courseRating: 72.0, // Standard Course Rating
-            slopeRating: 120,    // Standard Slope Rating
-            pars: Array(18).fill(4), // Standard-Par 4 for 18 holes
-            hcpIndices: Array.from({ length: 18 }, (_, i) => i + 1) // Standard-HCP-Index 1-18
-        };
+    <script type="module">
+        // Global variables for Firebase and data
+        let app, db, auth;
+        let authReady = false;
+        let tournamentDocRef;
+        let course = {};
         let players = [];
-        let scores = {}; // Stores scores per player and hole: {playerId: {hole1: score, hole2: score, ...}}
+        let scores = {};
+        let unsubscribeTournament, unsubscribePlayers;
 
         // Mode management
-        let currentMode = 'player'; // 'organizer' or 'player'
-        let activePlayerId = null; // ID of the currently logged-in player in player mode
-        const ORGANIZER_PASSWORD = "8105"; // Define the password for organizer mode
+        let currentMode = 'player';
+        let activePlayerId = null;
+        const ORGANIZER_PASSWORD = "8105";
 
         // DOM elements
-        const organizerModeBtnBottom = document.getElementById('organizerModeBtnBottom'); // New bottom button
+        const organizerModeBtnBottom = document.getElementById('organizerModeBtnBottom');
         const playerModeBtn = document.getElementById('playerModeBtn');
         const organizerContent = document.getElementById('organizerContent');
         const playerContent = document.getElementById('playerContent');
         const resetAllBtn = document.getElementById('resetAllBtn');
-        const leaderboardCard = document.getElementById('leaderboardCard'); // New: Reference to the leaderboard card
+        const leaderboardCard = document.getElementById('leaderboardCard');
 
         const tournamentNameInput = document.getElementById('tournamentName');
         const courseNameInput = document.getElementById('courseName');
@@ -483,14 +488,14 @@
         const addPlayerBtn = document.getElementById('addPlayerBtn');
         const playersTableBody = document.querySelector('#playersTable tbody');
 
-        const scoresTableBody = document.querySelector('#scoresTable tbody'); // For organizer view
-        const calculateScoresBtn = document.getElementById('calculateScoresBtn'); // For organizer view
+        const scoresTableBody = document.querySelector('#scoresTable tbody');
+        const calculateScoresBtn = document.getElementById('calculateScoresBtn');
 
         const playerWelcomeMessage = document.getElementById('playerWelcomeMessage');
-        const playerSelect = document.getElementById('playerSelect'); // New: Player select dropdown
-        const playerLoginBtn = document.getElementById('playerLoginBtn'); // New: Player login button
+        const playerSelect = document.getElementById('playerSelect');
+        const playerLoginBtn = document.getElementById('playerLoginBtn');
         const activePlayerScoreRow = document.getElementById('activePlayerScoreRow');
-        const playerSaveScoresBtn = document.getElementById('playerSaveScoresBtn'); // Renamed from playerCalculateScoresBtn
+        const playerSaveScoresBtn = document.getElementById('playerSaveScoresBtn');
 
         const leaderboardTableBody = document.querySelector('#leaderboardTable tbody');
 
@@ -500,60 +505,136 @@
         const messageBoxContent = document.getElementById('messageBoxContent');
         const messageBoxCloseBtn = document.getElementById('messageBoxCloseBtn');
 
-        // Password Modal elements
         const passwordModal = document.getElementById('passwordModal');
         const passwordInput = document.getElementById('passwordInput');
         const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
         const passwordCancelBtn = document.getElementById('passwordCancelBtn');
+        const spinner = document.createElement('div');
+        spinner.className = 'absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50';
+        spinner.innerHTML = '<div class="w-16 h-16 border-4 border-blue-400 border-dashed rounded-full animate-spin"></div>';
+
+        // --- Firebase Initialization and Data Fetching ---
+
+        async function initFirebase() {
+            try {
+                // Initialize Firebase services using global variables
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+                app = firebase.initializeApp(firebaseConfig);
+                auth = firebase.getAuth(app);
+                db = firebase.getFirestore(app);
+                firebase.setLogLevel('debug');
+
+                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+                if (initialAuthToken) {
+                    await firebase.signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await firebase.signInAnonymously(auth);
+                }
+
+                firebase.onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        authReady = true;
+                        // Define tournament document reference
+                        const tournamentsCollection = firebase.collection(db, `/artifacts/${appId}/public/data/tournaments`);
+                        // For simplicity, we will use a single hardcoded tournament ID.
+                        tournamentDocRef = firebase.doc(tournamentsCollection, 'current_tournament');
+                        await loadTournamentData();
+                    } else {
+                        console.log("User is signed out.");
+                    }
+                });
+
+            } catch (e) {
+                console.error("Firebase init failed:", e);
+                showMessageBox("Fehler", "Firebase-Initialisierung fehlgeschlagen. Überprüfen Sie die Konfiguration.");
+            }
+        }
+
+        async function loadTournamentData() {
+            try {
+                document.body.appendChild(spinner);
+                const docSnap = await firebase.getDoc(tournamentDocRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    // Load course data
+                    course = data.course || course;
+                    tournamentNameInput.value = course.tournamentName || '';
+                    courseNameInput.value = course.courseName || '';
+                    courseRatingInput.value = course.courseRating;
+                    slopeRatingInput.value = course.slopeRating;
+                    course.pars.forEach((par, i) => { document.getElementById(`par${i + 1}`).value = par; });
+                    course.hcpIndices.forEach((hcpIndex, i) => { document.getElementById(`hcpIndex${i + 1}`).value = hcpIndex; });
+                } else {
+                    // Create a new tournament document with initial data
+                    await firebase.setDoc(tournamentDocRef, {
+                        course: course
+                    });
+                }
+
+                // Set up real-time listeners for players and scores
+                if (unsubscribePlayers) unsubscribePlayers(); // Unsubscribe from previous listener
+                const playersCollectionRef = firebase.collection(tournamentDocRef, 'players');
+                unsubscribePlayers = firebase.onSnapshot(playersCollectionRef, (snapshot) => {
+                    const loadedPlayers = [];
+                    const loadedScores = {};
+                    snapshot.forEach(doc => {
+                        const playerData = doc.data();
+                        loadedPlayers.push(playerData);
+                        // Populate scores from each player's document
+                        loadedScores[playerData.id] = playerData.scores || {};
+                    });
+                    players = loadedPlayers;
+                    scores = loadedScores;
+                    renderPlayers();
+                    renderScoresInput();
+                    calculateAndRenderLeaderboard();
+                    spinner.remove();
+                }, (error) => {
+                    console.error("Error listening to players:", error);
+                    showMessageBox("Fehler", "Fehler beim Laden der Spielerdaten.");
+                });
+
+                // Initial UI setup based on loaded mode
+                switchMode(localStorage.getItem('golfStablefordCurrentMode') || 'player');
+
+            } catch (e) {
+                console.error("Error loading tournament data:", e);
+                showMessageBox("Fehler", "Fehler beim Laden der Turnierdaten.");
+            }
+        }
 
         // --- Helper functions ---
 
-        /**
-         * Displays a custom message box.
-         * @param {string} title - Title of the message.
-         * @param {string} content - Content of the message.
-         */
         function showMessageBox(title, content) {
             messageBoxTitle.textContent = title;
-            messageBoxContent.innerHTML = content; // Changed to innerHTML to allow HTML content
+            messageBoxContent.innerHTML = content;
             messageBox.classList.remove('hidden');
             messageBoxOverlay.classList.remove('hidden');
         }
 
-        /**
-         * Hides the message box.
-         */
         function hideMessageBox() {
             messageBox.classList.add('hidden');
             messageBoxOverlay.classList.add('hidden');
         }
 
-        /**
-         * Displays the custom password modal.
-         * @param {function} callback - Function to call with the password if submitted.
-         */
         function showPasswordModal(callback) {
-            passwordInput.value = ''; // Clear previous input
+            passwordInput.value = '';
             passwordModal.classList.remove('hidden');
-            messageBoxOverlay.classList.remove('hidden'); // Use the same overlay
-            passwordInput.focus(); // Focus the input field
-
-            // Store the callback for later use
+            messageBoxOverlay.classList.remove('hidden');
+            passwordInput.focus();
             passwordModal._submitCallback = callback;
         }
 
-        /**
-         * Hides the custom password modal.
-         */
         function hidePasswordModal() {
             passwordModal.classList.add('hidden');
             messageBoxOverlay.classList.add('hidden');
-            passwordModal._submitCallback = null; // Clear callback
+            passwordModal._submitCallback = null;
         }
 
-        /**
-         * Handles password submission from the custom modal.
-         */
         passwordSubmitBtn.addEventListener('click', () => {
             const enteredPassword = passwordInput.value;
             if (passwordModal._submitCallback) {
@@ -562,150 +643,50 @@
             hidePasswordModal();
         });
 
-        /**
-         * Handles password modal cancellation.
-         */
         passwordCancelBtn.addEventListener('click', () => {
             hidePasswordModal();
-            // If the user cancels the password prompt for organizer mode,
-            // ensure they stay in player mode or the previous mode.
-            // This is handled by not calling switchMode('organizer') if cancelled.
         });
 
-
-        /**
-         * Saves all application data to localStorage.
-         */
-        function saveData() {
-            try {
-                localStorage.setItem('golfStablefordCourse', JSON.stringify(course));
-                localStorage.setItem('golfStablefordPlayers', JSON.stringify(players));
-                localStorage.setItem('golfStablefordScores', JSON.stringify(scores));
-                localStorage.setItem('golfStablefordCurrentMode', currentMode);
-                localStorage.setItem('golfStablefordActivePlayerId', activePlayerId);
-            } catch (e) {
-                console.error("Error saving data:", e);
-                showMessageBox("Speicherfehler", "Die Daten konnten nicht gespeichert werden. Bitte überprüfen Sie den verfügbaren Speicherplatz oder die Browser-Einstellungen.");
-            }
-        }
-
-        /**
-         * Loads all application data from localStorage.
-         */
-        function loadData() {
-            try {
-                const savedCourse = localStorage.getItem('golfStablefordCourse');
-                const savedPlayers = localStorage.getItem('golfStablefordPlayers');
-                const savedScores = localStorage.getItem('golfStablefordScores');
-                const savedMode = localStorage.getItem('golfStablefordCurrentMode');
-                const savedPlayerId = localStorage.getItem('golfStablefordActivePlayerId');
-
-                if (savedCourse) {
-                    const loadedCourse = JSON.parse(savedCourse);
-                    course.tournamentName = loadedCourse.tournamentName || '';
-                    course.courseName = loadedCourse.courseName || '';
-                    course.courseRating = loadedCourse.courseRating !== undefined ? loadedCourse.courseRating : 72.0;
-                    course.slopeRating = loadedCourse.slopeRating !== undefined ? loadedCourse.slopeRating : 120;
-                    course.pars = loadedCourse.pars || Array(18).fill(4);
-                    course.hcpIndices = loadedCourse.hcpIndices || Array.from({ length: 18 }, (_, i) => i + 1);
-
-                    tournamentNameInput.value = course.tournamentName;
-                    courseNameInput.value = course.courseName;
-                    courseRatingInput.value = course.courseRating;
-                    slopeRatingInput.value = course.slopeRating;
-
-                    course.pars.forEach((par, i) => {
-                        const input = document.getElementById(`par${i + 1}`);
-                        if (input) input.value = par;
-                    });
-                    course.hcpIndices.forEach((hcpIndex, i) => {
-                        const input = document.getElementById(`hcpIndex${i + 1}`);
-                        if (input) input.value = hcpIndex;
-                    });
-                }
-                if (savedPlayers) {
-                    players = JSON.parse(savedPlayers);
-                }
-                if (savedScores) {
-                    scores = JSON.parse(savedScores);
-                }
-                if (savedMode) {
-                    currentMode = savedMode;
-                }
-                if (savedPlayerId) {
-                    activePlayerId = savedPlayerId;
-                }
-            } catch (e) {
-                console.error("Error loading data:", e);
-                showMessageBox("Ladefehler", "Die Daten konnten nicht geladen werden. Gespeicherte Daten könnten beschädigt sein.");
-            }
-        }
-
-        /**
-         * Switches the display mode (Organizer / Player) and updates UI accordingly.
-         * @param {string} mode - The mode to activate ('organizer' or 'player').
-         */
         function switchMode(mode) {
             if (mode === 'organizer') {
                 showPasswordModal((enteredPassword) => {
                     if (enteredPassword === ORGANIZER_PASSWORD) {
                         currentMode = 'organizer';
-                        saveData(); // Save the new mode
+                        localStorage.setItem('golfStablefordCurrentMode', currentMode);
                         organizerContent.classList.remove('hidden');
                         playerContent.classList.add('hidden');
                         resetAllBtn.classList.remove('hidden');
                         leaderboardCard.classList.remove('hidden');
-
                         playerModeBtn.classList.add('btn-secondary');
                         playerModeBtn.classList.remove('btn-primary');
                         organizerModeBtnBottom.classList.add('btn-primary');
                         organizerModeBtnBottom.classList.remove('btn-secondary');
-
-                        activePlayerId = null;
+                        showMessageBox("Erfolgreich", "Organisator-Modus aktiviert.");
                         renderPlayers();
                         renderScoresInput();
-                        showMessageBox("Erfolgreich", "Organisator-Modus aktiviert.");
                     } else {
                         showMessageBox("Zugriff verweigert", "Falsches Passwort. Sie können den Organisator-Modus nicht betreten.");
                     }
                 });
-                return; // Exit here, as the modal callback will handle the rest
+                return;
             }
 
-            // If not switching to organizer mode, proceed directly
             currentMode = mode;
-            saveData();
-
-            if (currentMode === 'player') {
-                organizerContent.classList.add('hidden');
-                playerContent.classList.remove('hidden');
-                resetAllBtn.classList.add('hidden');
-                leaderboardCard.classList.add('hidden');
-
-                playerModeBtn.classList.add('btn-primary');
-                playerModeBtn.classList.remove('btn-secondary');
-                organizerModeBtnBottom.classList.add('btn-secondary');
-                organizerModeBtnBottom.classList.remove('btn-primary');
-
-                populatePlayerSelect();
-
-                if (activePlayerId) {
-                    const player = players.find(p => p.id === activePlayerId);
-                    if (player) {
-                        playerSelect.value = activePlayerId;
-                        loginPlayer(activePlayerId);
-                        return;
-                    }
-                }
-                playerWelcomeMessage.textContent = "Bitte wählen Sie Ihren Namen und melden Sie sich an.";
-                activePlayerScoreRow.innerHTML = '<td>Schläge</td>';
-                playerSaveScoresBtn.disabled = true;
-            }
+            localStorage.setItem('golfStablefordCurrentMode', currentMode);
+            organizerContent.classList.add('hidden');
+            playerContent.classList.remove('hidden');
+            resetAllBtn.classList.add('hidden');
+            leaderboardCard.classList.add('hidden');
+            playerModeBtn.classList.add('btn-primary');
+            playerModeBtn.classList.remove('btn-secondary');
+            organizerModeBtnBottom.classList.add('btn-secondary');
+            organizerModeBtnBottom.classList.remove('btn-primary');
+            populatePlayerSelect();
+            playerWelcomeMessage.textContent = "Bitte wählen Sie Ihren Namen und melden Sie sich an.";
+            activePlayerScoreRow.innerHTML = '<td>Schläge</td>';
+            playerSaveScoresBtn.disabled = true;
         }
 
-        /**
-         * Populates the player selection dropdown.
-         */
         function populatePlayerSelect() {
             playerSelect.innerHTML = '<option value="">-- Spieler auswählen --</option>';
             players.forEach(player => {
@@ -716,115 +697,61 @@
             });
         }
 
-        /**
-         * Logs in a player based on their ID from the dropdown.
-         * @param {string} playerId - The ID of the player to log in.
-         */
-        function loginPlayer(playerId) {
+        async function loginPlayer(playerId) {
             const player = players.find(p => p.id === playerId);
             if (player) {
                 activePlayerId = player.id;
+                localStorage.setItem('golfStablefordActivePlayerId', activePlayerId);
+                playerSelect.value = playerId;
                 playerWelcomeMessage.textContent = `Willkommen, ${player.name}!`;
-                renderPlayerScoresInput(player); // Render scores for the active player
-                playerSaveScoresBtn.disabled = false; // Enable save button
+                renderPlayerScoresInput(player);
+                playerSaveScoresBtn.disabled = false;
                 showMessageBox("Erfolgreich", `Willkommen, ${player.name}!`);
-                saveData(); // Save active player
             } else {
-                activePlayerId = null; // Reset active player
+                activePlayerId = null;
+                localStorage.removeItem('golfStablefordActivePlayerId');
                 playerWelcomeMessage.textContent = "Bitte wählen Sie Ihren Namen und melden Sie sich an.";
-                activePlayerScoreRow.innerHTML = '<td>Schläge</td>'; // Clear score inputs
-                playerSaveScoresBtn.disabled = true; // Disable save button
+                activePlayerScoreRow.innerHTML = '<td>Schläge</td>';
+                playerSaveScoresBtn.disabled = true;
                 showMessageBox("Fehler", "Spieler nicht gefunden. Bitte wählen Sie einen gültigen Spieler.");
-                saveData(); // Save state
             }
         }
 
-        /**
-         * Calculates the playing handicap of a player.
-         * Formula: (Handicap Index * (Slope Rating / 113)) + (Course Rating - Par)
-         * The result is rounded.
-         * @param {number} handicapIndex - The player's Handicap Index.
-         * @param {number} courseRating - The course's Course Rating.
-         * @param {number} slopeRating - The course's Slope Rating.
-         * @param {number} totalPar - The sum of Par values for all 18 holes.
-         * @returns {number} The calculated playing handicap.
-         */
         function calculatePlayingHandicap(handicapIndex, courseRating, slopeRating, totalPar) {
             const playingHandicapRaw = (handicapIndex * (slopeRating / 113)) + (courseRating - totalPar);
-            // Round to the nearest integer
-            const playingHandicap = Math.round(playingHandicapRaw);
-            return playingHandicap;
+            return Math.round(playingHandicapRaw);
         }
 
-        /**
-         * Calculates the number of handicap strokes a player receives on a specific hole.
-         * Based on the playing handicap and the hole's handicap index.
-         * @param {number} playingHandicap - The player's calculated playing handicap.
-         * @param {number} holeHandicapIndex - The hole's handicap index (1-18).
-         * @returns {number} The number of additional strokes the player receives on this hole.
-         */
         function getHandicapStrokesPerHole(playingHandicap, holeHandicapIndex) {
             const baseStrokes = Math.floor(playingHandicap / 18);
             const remainingStrokes = playingHandicap % 18;
-            // Additional stroke if the hole's handicap index is within the remaining strokes
             return baseStrokes + (holeHandicapIndex <= remainingStrokes ? 1 : 0);
         }
 
-        /**
-         * Calculates Stableford points for a single hole.
-         * @param {number} grossScore - The player's gross score on this hole.
-         * @param {number} holePar - The hole's Par.
-         * @param {number} playingHandicap - The player's playing handicap.
-         * @param {number} holeHandicapIndex - The hole's handicap index.
-         * @returns {number} The Stableford points for this hole.
-         */
         function calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHandicapIndex) {
-            if (isNaN(grossScore) || grossScore <= 0) {
-                return 0; // No points if no valid score was entered
-            }
-
+            if (isNaN(grossScore) || grossScore <= 0) return 0;
             const netStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHandicapIndex);
             const netParForHole = holePar + netStrokesForHole;
-
-            // Stableford formula: 2 + (Net-Par - Gross Score)
-            // Points are at least 0
             return Math.max(0, 2 + (netParForHole - grossScore));
         }
 
-        /**
-         * Updates the display of the player list in organizer mode.
-         */
         function renderPlayers() {
             playersTableBody.innerHTML = '';
-            const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
-
-            players.forEach((player, index) => {
-                const playingHandicap = calculatePlayingHandicap(
-                    player.handicap,
-                    course.courseRating,
-                    course.slopeRating,
-                    totalPar
-                );
-                // Store the calculated playing handicap in the player object for display
+            const totalPar = course.pars ? course.pars.reduce((sum, p) => sum + p, 0) : 0;
+            players.forEach((player) => {
+                const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
                 player.playingHandicap = playingHandicap;
-
                 const row = playersTableBody.insertRow();
                 row.innerHTML = `
                     <td>${player.name}</td>
                     <td>${player.handicap.toFixed(1)}</td>
                     <td>${player.playingHandicap}</td>
-                    <td>
-                        <button class="btn btn-danger btn-sm" data-player-id="${player.id}">Entfernen</button>
-                    </td>
+                    <td><button class="btn btn-danger btn-sm" data-player-id="${player.id}">Entfernen</button></td>
                 `;
                 row.querySelector('button').addEventListener('click', (e) => removePlayer(e.target.dataset.playerId));
             });
-            saveData(); // Save the updated player data (incl. playing handicap)
         }
 
-        /**
-         * Updates the display of score input fields in organizer mode.
-         */
         function renderScoresInput() {
             scoresTableBody.innerHTML = '';
             players.forEach(player => {
@@ -834,10 +761,9 @@
                     const cell = row.insertCell();
                     const input = document.createElement('input');
                     input.type = 'number';
-                    input.min = '1'; // Minimum score
-                    input.max = '15'; // Realistic max score per hole
+                    input.min = '1';
+                    input.max = '15';
                     input.className = 'score-input';
-                    input.id = `score-${player.id}-hole${i}`;
                     input.value = scores[player.id] && scores[player.id][`hole${i}`] ? scores[player.id][`hole${i}`] : '';
                     input.addEventListener('change', (e) => saveScore(player.id, i, parseInt(e.target.value)));
                     cell.appendChild(input);
@@ -845,12 +771,8 @@
             });
         }
 
-        /**
-         * Renders the score input fields for the currently active player in player mode.
-         * @param {object} player - The player object of the active player.
-         */
         function renderPlayerScoresInput(player) {
-            activePlayerScoreRow.innerHTML = '<td>Schläge</td>'; // Reset row content
+            activePlayerScoreRow.innerHTML = '<td>Schläge</td>';
             for (let i = 1; i <= 18; i++) {
                 const cell = document.createElement('td');
                 const input = document.createElement('input');
@@ -858,7 +780,6 @@
                 input.min = '1';
                 input.max = '15';
                 input.className = 'score-input';
-                input.id = `player-score-${player.id}-hole${i}`;
                 input.value = scores[player.id] && scores[player.id][`hole${i}`] ? scores[player.id][`hole${i}`] : '';
                 input.addEventListener('change', (e) => saveScore(player.id, i, parseInt(e.target.value)));
                 cell.appendChild(input);
@@ -866,48 +787,25 @@
             }
         }
 
-        /**
-         * Calculates Stableford points for all players and updates the leaderboard.
-         */
         function calculateAndRenderLeaderboard() {
             const leaderboardData = [];
-            const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
-
+            const totalPar = course.pars ? course.pars.reduce((sum, p) => sum + p, 0) : 0;
             players.forEach(player => {
                 let totalStablefordPoints = 0;
                 let playerScores = scores[player.id] || {};
-
-                // Calculate playing handicap for the player
-                const playingHandicap = calculatePlayingHandicap(
-                    player.handicap,
-                    course.courseRating,
-                    course.slopeRating,
-                    totalPar
-                );
-
+                const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
                 for (let i = 1; i <= 18; i++) {
                     const holePar = course.pars[i - 1];
                     const holeHcpIndex = course.hcpIndices[i - 1];
                     const grossScore = parseInt(playerScores[`hole${i}`]);
-
                     if (!isNaN(grossScore) && grossScore > 0) {
                         totalStablefordPoints += calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
                     }
                 }
-                // Update the player object in the 'players' array with the calculated total points
-                player.totalPoints = totalStablefordPoints; // THIS IS THE KEY FIX
-                leaderboardData.push({
-                    name: player.name,
-                    handicap: player.handicap,
-                    playingHandicap: playingHandicap,
-                    totalPoints: totalStablefordPoints
-                });
+                player.totalPoints = totalStablefordPoints;
+                leaderboardData.push({ name: player.name, handicap: player.handicap, playingHandicap: playingHandicap, totalPoints: totalStablefordPoints });
             });
-
-            // Sort leaderboard by points in descending order
             leaderboardData.sort((a, b) => b.totalPoints - a.totalPoints);
-
-            // Render leaderboard
             leaderboardTableBody.innerHTML = '';
             leaderboardData.forEach((player, index) => {
                 const row = leaderboardTableBody.insertRow();
@@ -919,61 +817,63 @@
                     <td>${player.totalPoints}</td>
                 `;
             });
-
             if (leaderboardData.length === 0) {
                 const row = leaderboardTableBody.insertRow();
                 row.innerHTML = `<td colspan="5" class="text-center text-gray-500 py-4">Noch keine Ergebnisse vorhanden.</td>`;
             }
-            saveData(); // Save the updated leaderboard (implicitly through scores and players)
+        }
+
+        // --- Firebase Firestore Operations ---
+
+        async function updateCourseData() {
+            if (!authReady) return;
+            await firebase.setDoc(tournamentDocRef, { course: course }, { merge: true });
+        }
+
+        async function addPlayerToDB(player) {
+            if (!authReady) return;
+            const playersCollectionRef = firebase.collection(tournamentDocRef, 'players');
+            const newPlayerDocRef = firebase.doc(playersCollectionRef, player.id);
+            await firebase.setDoc(newPlayerDocRef, player, { merge: true });
+        }
+
+        async function removePlayerFromDB(playerId) {
+            if (!authReady) return;
+            const playerDocRef = firebase.doc(firebase.collection(tournamentDocRef, 'players'), playerId);
+            await firebase.deleteDoc(playerDocRef);
+        }
+
+        async function saveScoreToDB(playerId, holeNumber, score) {
+            if (!authReady) return;
+            const playerDocRef = firebase.doc(firebase.collection(tournamentDocRef, 'players'), playerId);
+            const scoreKey = `scores.hole${holeNumber}`;
+            await firebase.setDoc(playerDocRef, { [scoreKey]: score }, { merge: true });
         }
 
         // --- Event handlers ---
-
-        /**
-         * Saves course details (tournament name, course name, Par, HCP Index, Course Rating, Slope Rating).
-         */
         saveCourseBtn.addEventListener('click', () => {
             course.tournamentName = tournamentNameInput.value.trim();
             course.courseName = courseNameInput.value.trim();
             course.courseRating = parseFloat(courseRatingInput.value);
             course.slopeRating = parseInt(slopeRatingInput.value);
-
             const newPars = [];
             const newHcpIndices = [];
             let isValid = true;
-
-            if (isNaN(course.courseRating) || course.courseRating < 50 || course.courseRating > 80) {
-                showMessageBox("Fehler", "Bitte geben Sie ein gültiges Course Rating (z.B. 72.0) ein.");
-                isValid = false;
-            } else if (isNaN(course.slopeRating) || course.slopeRating < 55 || course.slopeRating > 155) {
-                showMessageBox("Fehler", "Bitte geben Sie ein gültiges Slope Rating (55-155) ein.");
-                isValid = false;
-            }
-
+            if (isNaN(course.courseRating) || course.courseRating < 50 || course.courseRating > 80) { showMessageBox("Fehler", "Bitte geben Sie ein gültiges Course Rating (z.B. 72.0) ein."); isValid = false; }
+            if (isNaN(course.slopeRating) || course.slopeRating < 55 || course.slopeRating > 155) { showMessageBox("Fehler", "Bitte geben Sie ein gültiges Slope Rating (55-155) ein."); isValid = false; }
             if (isValid) {
                 for (let i = 1; i <= 18; i++) {
                     const parInput = document.getElementById(`par${i}`);
                     const hcpIndexInput = document.getElementById(`hcpIndex${i}`);
                     const par = parseInt(parInput.value);
                     const hcpIndex = parseInt(hcpIndexInput.value);
-
-                    if (isNaN(par) || par < 3 || par > 5) {
-                        showMessageBox("Fehler", `Bitte geben Sie für Loch ${i} ein gültiges Par (3-5) ein.`);
-                        isValid = false;
-                        break;
-                    }
-                    if (isNaN(hcpIndex) || hcpIndex < 1 || hcpIndex > 18) {
-                        showMessageBox("Fehler", `Bitte geben Sie für Loch ${i} einen gültigen HCP Index (1-18) ein.`);
-                        isValid = false;
-                        break;
-                    }
+                    if (isNaN(par) || par < 3 || par > 5) { showMessageBox("Fehler", `Bitte geben Sie für Loch ${i} ein gültiges Par (3-5) ein.`); isValid = false; break; }
+                    if (isNaN(hcpIndex) || hcpIndex < 1 || hcpIndex > 18) { showMessageBox("Fehler", `Bitte geben Sie für Loch ${i} einen gültigen HCP Index (1-18) ein.`); isValid = false; break; }
                     newPars.push(par);
                     newHcpIndices.push(hcpIndex);
                 }
             }
-
             if (isValid) {
-                // Check if HCP Indices are unique and contain all values from 1 to 18
                 const uniqueHcpIndices = new Set(newHcpIndices);
                 if (uniqueHcpIndices.size !== 18) {
                     showMessageBox("Fehler", "Die HCP Indices müssen einzigartig sein und alle Werte von 1 bis 18 enthalten.");
@@ -981,87 +881,39 @@
                 } else {
                     course.pars = newPars;
                     course.hcpIndices = newHcpIndices;
-                    saveData();
-                    renderPlayers(); // Update player list as playing handicap might change
-                    calculateAndRenderLeaderboard(); // Update leaderboard
+                    updateCourseData();
                     showMessageBox("Erfolgreich", "Platz-Einstellungen gespeichert!");
                 }
             }
         });
 
-        /**
-         * Adds a new player.
-         */
-        addPlayerBtn.addEventListener('click', () => {
+        addPlayerBtn.addEventListener('click', async () => {
             const name = playerNameInput.value.trim();
             const handicap = parseFloat(playerHandicapInput.value);
-
-            if (!name) {
-                showMessageBox("Fehler", "Bitte geben Sie einen Spielernamen ein.");
-                return;
-            }
-            if (isNaN(handicap) || handicap < 0 || handicap > 54) {
-                showMessageBox("Fehler", "Bitte geben Sie einen gültigen Handicap Index (0.0-54.0) ein.");
-                return;
-            }
-            if (players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
-                showMessageBox("Fehler", "Ein Spieler mit diesem Namen existiert bereits. Bitte wählen Sie einen anderen Namen.");
-                return;
-            }
-
-            const newPlayer = {
-                id: Date.now().toString(), // Unique ID
-                name: name,
-                handicap: handicap,
-                playingHandicap: 0 // Will be calculated in renderPlayers
-            };
-            players.push(newPlayer);
-            scores[newPlayer.id] = {}; // Initialize empty scores for the new player
-            saveData();
-            renderPlayers();
-            renderScoresInput(); // Ensure organizer score input is updated with new player
+            if (!name) { showMessageBox("Fehler", "Bitte geben Sie einen Spielernamen ein."); return; }
+            if (isNaN(handicap) || handicap < 0 || handicap > 54) { showMessageBox("Fehler", "Bitte geben Sie einen gültigen Handicap Index (0.0-54.0) ein."); return; }
+            if (players.some(p => p.name.toLowerCase() === name.toLowerCase())) { showMessageBox("Fehler", "Ein Spieler mit diesem Namen existiert bereits. Bitte wählen Sie einen anderen Namen."); return; }
+            const newPlayer = { id: Date.now().toString(), name: name, handicap: handicap, scores: {} };
+            await addPlayerToDB(newPlayer);
             playerNameInput.value = '';
-            playerHandicapInput.value = '18.0'; // Reset to default value
+            playerHandicapInput.value = '18.0';
             showMessageBox("Erfolgreich", `${name} wurde hinzugefügt.`);
         });
 
-        /**
-         * Removes a player.
-         * @param {string} playerId - The ID of the player to remove.
-         */
         function removePlayer(playerId) {
-            players = players.filter(player => player.id !== playerId);
-            delete scores[playerId]; // Also remove player's scores
-            saveData();
-            renderPlayers();
-            renderScoresInput(); // Ensure organizer score input is updated after removal
-            calculateAndRenderLeaderboard(); // Update leaderboard
+            removePlayerFromDB(playerId);
             showMessageBox("Erfolgreich", "Spieler wurde entfernt.");
         }
 
-        /**
-         * Saves the entered score for a hole.
-         * @param {string} playerId - The player's ID.
-         * @param {number} holeNumber - The hole number (1-18).
-         * @param {number} score - The entered score.
-         */
         function saveScore(playerId, holeNumber, score) {
-            if (!scores[playerId]) {
-                scores[playerId] = {};
-            }
-            scores[playerId][`hole${holeNumber}`] = score;
-            saveData();
+            saveScoreToDB(playerId, holeNumber, score);
         }
 
-        // Event listener for the message box
         messageBoxCloseBtn.addEventListener('click', hideMessageBox);
-        messageBoxOverlay.addEventListener('click', hideMessageBox); // Closes on overlay click
-
-        // Event listeners for mode switching
-        organizerModeBtnBottom.addEventListener('click', () => switchMode('organizer')); // Bottom button
+        messageBoxOverlay.addEventListener('click', hideMessageBox);
+        organizerModeBtnBottom.addEventListener('click', () => switchMode('organizer'));
         playerModeBtn.addEventListener('click', () => switchMode('player'));
 
-        // Event listener for player login in player mode
         playerLoginBtn.addEventListener('click', () => {
             const selectedPlayerId = playerSelect.value;
             if (selectedPlayerId) {
@@ -1071,11 +923,11 @@
             }
         });
 
-        // Event listeners for calculation buttons
-        calculateScoresBtn.addEventListener('click', calculateAndRenderLeaderboard); // Organizer
-        playerSaveScoresBtn.addEventListener('click', () => { // Player save button
-            calculateAndRenderLeaderboard(); // Recalculate and save all data
+        calculateScoresBtn.addEventListener('click', () => {
+            showMessageBox("Erfolg", "Rangliste aktualisiert.");
+        });
 
+        playerSaveScoresBtn.addEventListener('click', () => {
             const activePlayer = players.find(p => p.id === activePlayerId);
             if (activePlayer && typeof activePlayer.totalPoints === 'number') {
                 let perHolePointsHtml = `
@@ -1094,23 +946,14 @@
                             </thead>
                             <tbody>
                 `;
-
                 const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
-                const playingHandicap = calculatePlayingHandicap(
-                    activePlayer.handicap,
-                    course.courseRating,
-                    course.slopeRating,
-                    totalPar
-                );
-
+                const playingHandicap = calculatePlayingHandicap(activePlayer.handicap, course.courseRating, course.slopeRating, totalPar);
                 for (let i = 1; i <= 18; i++) {
                     const holePar = course.pars[i - 1];
                     const holeHcpIndex = course.hcpIndices[i - 1];
                     const grossScore = scores[activePlayer.id] && scores[activePlayer.id][`hole${i}`] ? parseInt(scores[activePlayer.id][`hole${i}`]) : NaN;
                     const stablefordPoints = calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
                     const handicapStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
-
-
                     perHolePointsHtml += `
                         <tr class="bg-white border-b hover:bg-gray-50">
                             <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">Loch ${i}</td>
@@ -1121,29 +964,22 @@
                         </tr>
                     `;
                 }
-
                 perHolePointsHtml += `
                             </tbody>
                         </table>
                     </div>
                     <p class="text-lg font-bold mt-4">Gesamt Stableford Punkte: ${activePlayer.totalPoints}</p>
                 `;
-
                 showMessageBox("Erfolg", perHolePointsHtml);
             } else {
-                showMessageBox("Erfolgreich", "Ihr Score wurde gespeichert."); // Fallback
+                showMessageBox("Erfolgreich", "Ihr Score wurde gespeichert.");
             }
         });
 
-        // Event listener for the reset button
         resetAllBtn.addEventListener('click', () => {
-            showMessageBox(
-                "Bestätigung",
-                "Möchten Sie wirklich alle Turnierdaten zurücksetzen? Diese Aktion kann nicht rückgängig gemacht werden."
-            );
-            // Temporarily re-purpose the MessageBox's OK button for the reset process
+            showMessageBox("Bestätigung", "Möchten Sie wirklich alle Turnierdaten zurücksetzen? Diese Aktion kann nicht rückgängig gemacht werden.");
             messageBoxCloseBtn.onclick = () => {
-                hideMessageBox(); // Hide confirmation message box
+                hideMessageBox();
                 showPasswordModal((enteredPassword) => {
                     if (enteredPassword === ORGANIZER_PASSWORD) {
                         resetAllData();
@@ -1151,54 +987,34 @@
                     } else {
                         showMessageBox("Zugriff verweigert", "Falsches Passwort. Daten wurden nicht zurückgesetzt.");
                     }
-                    messageBoxCloseBtn.onclick = hideMessageBox; // Restore original function
+                    messageBoxCloseBtn.onclick = hideMessageBox;
                 });
             };
         });
 
-        /**
-         * Resets all application data.
-         */
-        function resetAllData() {
-            course = {
-                tournamentName: '',
-                courseName: '',
-                courseRating: 72.0,
-                slopeRating: 120,
-                pars: Array(18).fill(4),
-                hcpIndices: Array.from({ length: 18 }, (_, i) => i + 1)
-            };
-            players = [];
-            scores = {};
-            currentMode = 'organizer'; // After reset, always go to organizer mode
-            activePlayerId = null;
-
-            // Reset UI elements
-            tournamentNameInput.value = '';
-            courseNameInput.value = '';
-            courseRatingInput.value = course.courseRating;
-            slopeRatingInput.value = course.slopeRating;
-            course.pars.forEach((par, i) => {
-                const input = document.getElementById(`par${i + 1}`);
-                if (input) input.value = par;
+        async function resetAllData() {
+            if (!authReady) return;
+            const batch = firebase.writeBatch(db);
+            // Delete player documents
+            const playersCollectionRef = firebase.collection(tournamentDocRef, 'players');
+            const playerDocs = await firebase.getDocs(playersCollectionRef);
+            playerDocs.forEach(doc => {
+                batch.delete(doc.ref);
             });
-            course.hcpIndices.forEach((hcpIndex, i) => {
-                const input = document.getElementById(`hcpIndex${i + 1}`);
-                if (input) input.value = hcpIndex;
-            });
-            playerNameInput.value = '';
-            playerHandicapInput.value = '18.0';
-
-            saveData();
-            // After reset, set the mode again to correctly initialize the UI.
-            switchMode('organizer'); // This will ensure UI is correctly set to organizer mode
+            // Reset course data
+            course = { tournamentName: '', courseName: '', courseRating: 72.0, slopeRating: 120, pars: Array(18).fill(4), hcpIndices: Array.from({ length: 18 }, (_, i) => i + 1) };
+            batch.set(tournamentDocRef, { course: course });
+            await batch.commit();
+            localStorage.setItem('golfStablefordCurrentMode', 'organizer');
+            localStorage.removeItem('golfStablefordActivePlayerId');
+            switchMode('organizer');
         }
 
         // Initialization on page load
         document.addEventListener('DOMContentLoaded', () => {
-            loadData();
-            // Initial mode setup
-            switchMode(currentMode); // Use the currentMode loaded from localStorage
+            initFirebase();
+            const savedMode = localStorage.getItem('golfStablefordCurrentMode') || 'player';
+            switchMode(savedMode);
         });
     </script>
 </body>
