@@ -450,6 +450,7 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, addDoc, getDocs, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
 
         let app, db, auth;
         let authReady = false;
@@ -457,11 +458,22 @@
         let course = {};
         let players = [];
         let scores = {};
-        let unsubscribeTournament, unsubscribePlayers;
+        let unsubscribePlayers;
 
         let currentMode = 'player';
         let activePlayerId = null;
         const ORGANIZER_PASSWORD = "8105";
+        // Ihre Firebase-Konfiguration hier
+        const firebaseConfig = {
+            apiKey: "AIzaSyCk-XEKnnWqRlTqVXUFCxGc69JpmhErIT8",
+            authDomain: "rgnt-8105-stableford.firebaseapp.com",
+            projectId: "rgnt-8105-stableford",
+            storageBucket: "rgnt-8105-stableford.firebasestorage.app",
+            messagingSenderId: "774338268555",
+            appId: "1:774338268555:web:ded58e0759d42ee46d338e",
+            measurementId: "G-DXQG00EWHW"
+        };
+        const appId = firebaseConfig.projectId;
 
         const organizerModeBtnBottom = document.getElementById('organizerModeBtnBottom');
         const playerModeBtn = document.getElementById('playerModeBtn');
@@ -671,7 +683,7 @@
             const totalPar = course.pars ? course.pars.reduce((sum, p) => sum + p, 0) : 0;
             players.forEach(player => {
                 let totalStablefordPoints = 0;
-                let playerScores = scores[player.id] || {};
+                let playerScores = players.find(p => p.id === player.id)?.scores || {};
                 const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
                 for (let i = 1; i <= 18; i++) {
                     const holePar = course.pars[i - 1];
@@ -897,24 +909,31 @@
 
         async function initFirebase() {
             try {
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                // Hier fügen Sie Ihre Firebase-Konfiguration ein
+                const firebaseConfig = {
+                    apiKey: "AIzaSyCk-XEKnnWqRlTqVXUFCxGc69JpmhErIT8",
+                    authDomain: "rgnt-8105-stableford.firebaseapp.com",
+                    projectId: "rgnt-8105-stableford",
+                    storageBucket: "rgnt-8105-stableford.firebasestorage.app",
+                    messagingSenderId: "774338268555",
+                    appId: "1:774338268555:web:ded58e0759d42ee46d338e",
+                    measurementId: "G-DXQG00EWHW"
+                };
+                const appId = firebaseConfig.projectId;
 
                 if (!getApps().length) {
                     app = initializeApp(firebaseConfig);
                 } else {
                     app = getApps()[0];
                 }
+
                 auth = getAuth(app);
                 db = getFirestore(app);
                 setLogLevel('debug');
+                getAnalytics(app);
 
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                // Hier ist die einzige Authentifizierungsmethode, die für Ihre App benötigt wird
+                await signInAnonymously(auth);
 
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
