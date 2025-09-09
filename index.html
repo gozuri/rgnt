@@ -7,14 +7,6 @@
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, addDoc, getDocs, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        window.firebase = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, addDoc, getDocs, deleteDoc, writeBatch, setLogLevel };
-    </script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -454,7 +446,11 @@
     </div>
 
     <script type="module">
-        // Global variables for Firebase and data
+        import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, addDoc, getDocs, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
         let app, db, auth;
         let authReady = false;
         let tournamentDocRef;
@@ -463,48 +459,39 @@
         let scores = {};
         let unsubscribeTournament, unsubscribePlayers;
 
-        // Mode management
         let currentMode = 'player';
         let activePlayerId = null;
         const ORGANIZER_PASSWORD = "8105";
 
-        // DOM elements
         const organizerModeBtnBottom = document.getElementById('organizerModeBtnBottom');
         const playerModeBtn = document.getElementById('playerModeBtn');
         const organizerContent = document.getElementById('organizerContent');
         const playerContent = document.getElementById('playerContent');
         const resetAllBtn = document.getElementById('resetAllBtn');
         const leaderboardCard = document.getElementById('leaderboardCard');
-
         const tournamentNameInput = document.getElementById('tournamentName');
         const courseNameInput = document.getElementById('courseName');
         const courseRatingInput = document.getElementById('courseRating');
         const slopeRatingInput = document.getElementById('slopeRating');
         const saveCourseBtn = document.getElementById('saveCourseBtn');
         const courseDetailsTable = document.getElementById('courseDetailsTable');
-
         const playerNameInput = document.getElementById('playerName');
         const playerHandicapInput = document.getElementById('playerHandicap');
         const addPlayerBtn = document.getElementById('addPlayerBtn');
         const playersTableBody = document.querySelector('#playersTable tbody');
-
         const scoresTableBody = document.querySelector('#scoresTable tbody');
         const calculateScoresBtn = document.getElementById('calculateScoresBtn');
-
         const playerWelcomeMessage = document.getElementById('playerWelcomeMessage');
         const playerSelect = document.getElementById('playerSelect');
         const playerLoginBtn = document.getElementById('playerLoginBtn');
         const activePlayerScoreRow = document.getElementById('activePlayerScoreRow');
         const playerSaveScoresBtn = document.getElementById('playerSaveScoresBtn');
-
         const leaderboardTableBody = document.querySelector('#leaderboardTable tbody');
-
         const messageBox = document.getElementById('messageBox');
         const messageBoxOverlay = document.getElementById('messageBoxOverlay');
         const messageBoxTitle = document.getElementById('messageBoxTitle');
         const messageBoxContent = document.getElementById('messageBoxContent');
         const messageBoxCloseBtn = document.getElementById('messageBoxCloseBtn');
-
         const passwordModal = document.getElementById('passwordModal');
         const passwordInput = document.getElementById('passwordInput');
         const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
@@ -512,102 +499,6 @@
         const spinner = document.createElement('div');
         spinner.className = 'absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50';
         spinner.innerHTML = '<div class="w-16 h-16 border-4 border-blue-400 border-dashed rounded-full animate-spin"></div>';
-
-        // --- Firebase Initialization and Data Fetching ---
-
-        async function initFirebase() {
-            try {
-                // Initialize Firebase services using global variables
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-                app = firebase.initializeApp(firebaseConfig);
-                auth = firebase.getAuth(app);
-                db = firebase.getFirestore(app);
-                firebase.setLogLevel('debug');
-
-                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-                if (initialAuthToken) {
-                    await firebase.signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await firebase.signInAnonymously(auth);
-                }
-
-                firebase.onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        authReady = true;
-                        // Define tournament document reference
-                        const tournamentsCollection = firebase.collection(db, `/artifacts/${appId}/public/data/tournaments`);
-                        // For simplicity, we will use a single hardcoded tournament ID.
-                        tournamentDocRef = firebase.doc(tournamentsCollection, 'current_tournament');
-                        await loadTournamentData();
-                    } else {
-                        console.log("User is signed out.");
-                    }
-                });
-
-            } catch (e) {
-                console.error("Firebase init failed:", e);
-                showMessageBox("Fehler", "Firebase-Initialisierung fehlgeschlagen. Überprüfen Sie die Konfiguration.");
-            }
-        }
-
-        async function loadTournamentData() {
-            try {
-                document.body.appendChild(spinner);
-                const docSnap = await firebase.getDoc(tournamentDocRef);
-
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    // Load course data
-                    course = data.course || course;
-                    tournamentNameInput.value = course.tournamentName || '';
-                    courseNameInput.value = course.courseName || '';
-                    courseRatingInput.value = course.courseRating;
-                    slopeRatingInput.value = course.slopeRating;
-                    course.pars.forEach((par, i) => { document.getElementById(`par${i + 1}`).value = par; });
-                    course.hcpIndices.forEach((hcpIndex, i) => { document.getElementById(`hcpIndex${i + 1}`).value = hcpIndex; });
-                } else {
-                    // Create a new tournament document with initial data
-                    await firebase.setDoc(tournamentDocRef, {
-                        course: course
-                    });
-                }
-
-                // Set up real-time listeners for players and scores
-                if (unsubscribePlayers) unsubscribePlayers(); // Unsubscribe from previous listener
-                const playersCollectionRef = firebase.collection(tournamentDocRef, 'players');
-                unsubscribePlayers = firebase.onSnapshot(playersCollectionRef, (snapshot) => {
-                    const loadedPlayers = [];
-                    const loadedScores = {};
-                    snapshot.forEach(doc => {
-                        const playerData = doc.data();
-                        loadedPlayers.push(playerData);
-                        // Populate scores from each player's document
-                        loadedScores[playerData.id] = playerData.scores || {};
-                    });
-                    players = loadedPlayers;
-                    scores = loadedScores;
-                    renderPlayers();
-                    renderScoresInput();
-                    calculateAndRenderLeaderboard();
-                    spinner.remove();
-                }, (error) => {
-                    console.error("Error listening to players:", error);
-                    showMessageBox("Fehler", "Fehler beim Laden der Spielerdaten.");
-                });
-
-                // Initial UI setup based on loaded mode
-                switchMode(localStorage.getItem('golfStablefordCurrentMode') || 'player');
-
-            } catch (e) {
-                console.error("Error loading tournament data:", e);
-                showMessageBox("Fehler", "Fehler beim Laden der Turnierdaten.");
-            }
-        }
-
-        // --- Helper functions ---
 
         function showMessageBox(title, content) {
             messageBoxTitle.textContent = title;
@@ -634,18 +525,6 @@
             messageBoxOverlay.classList.add('hidden');
             passwordModal._submitCallback = null;
         }
-
-        passwordSubmitBtn.addEventListener('click', () => {
-            const enteredPassword = passwordInput.value;
-            if (passwordModal._submitCallback) {
-                passwordModal._submitCallback(enteredPassword);
-            }
-            hidePasswordModal();
-        });
-
-        passwordCancelBtn.addEventListener('click', () => {
-            hidePasswordModal();
-        });
 
         function switchMode(mode) {
             if (mode === 'organizer') {
@@ -823,34 +702,42 @@
             }
         }
 
-        // --- Firebase Firestore Operations ---
-
         async function updateCourseData() {
             if (!authReady) return;
-            await firebase.setDoc(tournamentDocRef, { course: course }, { merge: true });
+            await setDoc(tournamentDocRef, { course: course }, { merge: true });
         }
 
         async function addPlayerToDB(player) {
             if (!authReady) return;
-            const playersCollectionRef = firebase.collection(tournamentDocRef, 'players');
-            const newPlayerDocRef = firebase.doc(playersCollectionRef, player.id);
-            await firebase.setDoc(newPlayerDocRef, player, { merge: true });
+            const playersCollectionRef = collection(tournamentDocRef, 'players');
+            const newPlayerDocRef = doc(playersCollectionRef, player.id);
+            await setDoc(newPlayerDocRef, player, { merge: true });
         }
 
         async function removePlayerFromDB(playerId) {
             if (!authReady) return;
-            const playerDocRef = firebase.doc(firebase.collection(tournamentDocRef, 'players'), playerId);
-            await firebase.deleteDoc(playerDocRef);
+            const playerDocRef = doc(collection(tournamentDocRef, 'players'), playerId);
+            await deleteDoc(playerDocRef);
         }
 
         async function saveScoreToDB(playerId, holeNumber, score) {
             if (!authReady) return;
-            const playerDocRef = firebase.doc(firebase.collection(tournamentDocRef, 'players'), playerId);
+            const playerDocRef = doc(collection(tournamentDocRef, 'players'), playerId);
             const scoreKey = `scores.hole${holeNumber}`;
-            await firebase.setDoc(playerDocRef, { [scoreKey]: score }, { merge: true });
+            await setDoc(playerDocRef, { [scoreKey]: score }, { merge: true });
         }
 
-        // --- Event handlers ---
+        passwordSubmitBtn.addEventListener('click', () => {
+            const enteredPassword = passwordInput.value;
+            if (passwordModal._submitCallback) {
+                passwordModal._submitCallback(enteredPassword);
+            }
+        });
+
+        passwordCancelBtn.addEventListener('click', () => {
+            hidePasswordModal();
+        });
+
         saveCourseBtn.addEventListener('click', () => {
             course.tournamentName = tournamentNameInput.value.trim();
             course.courseName = courseNameInput.value.trim();
@@ -994,14 +881,12 @@
 
         async function resetAllData() {
             if (!authReady) return;
-            const batch = firebase.writeBatch(db);
-            // Delete player documents
-            const playersCollectionRef = firebase.collection(tournamentDocRef, 'players');
-            const playerDocs = await firebase.getDocs(playersCollectionRef);
-            playerDocs.forEach(doc => {
-                batch.delete(doc.ref);
+            const batch = writeBatch(db);
+            const playersCollectionRef = collection(tournamentDocRef, 'players');
+            const playerDocs = await getDocs(playersCollectionRef);
+            playerDocs.forEach(d => {
+                batch.delete(d.ref);
             });
-            // Reset course data
             course = { tournamentName: '', courseName: '', courseRating: 72.0, slopeRating: 120, pars: Array(18).fill(4), hcpIndices: Array.from({ length: 18 }, (_, i) => i + 1) };
             batch.set(tournamentDocRef, { course: course });
             await batch.commit();
@@ -1010,11 +895,189 @@
             switchMode('organizer');
         }
 
-        // Initialization on page load
+        async function initFirebase() {
+            try {
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+                if (!getApps().length) {
+                    app = initializeApp(firebaseConfig);
+                } else {
+                    app = getApps()[0];
+                }
+                auth = getAuth(app);
+                db = getFirestore(app);
+                setLogLevel('debug');
+
+                const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        authReady = true;
+                        const tournamentsCollection = collection(db, `/artifacts/${appId}/public/data/tournaments`);
+                        tournamentDocRef = doc(tournamentsCollection, 'current_tournament');
+                        await loadTournamentData();
+                    } else {
+                        console.log("User is signed out.");
+                    }
+                });
+
+            } catch (e) {
+                console.error("Firebase init failed:", e);
+                showMessageBox("Fehler", "Firebase-Initialisierung fehlgeschlagen. Überprüfen Sie die Konfiguration.");
+            }
+        }
+
+        async function loadTournamentData() {
+            try {
+                document.body.appendChild(spinner);
+                const docSnap = await getDoc(tournamentDocRef);
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    course = data.course || course;
+                    tournamentNameInput.value = course.tournamentName || '';
+                    courseNameInput.value = course.courseName || '';
+                    courseRatingInput.value = course.courseRating;
+                    slopeRatingInput.value = course.slopeRating;
+                    course.pars.forEach((par, i) => { document.getElementById(`par${i + 1}`).value = par; });
+                    course.hcpIndices.forEach((hcpIndex, i) => { document.getElementById(`hcpIndex${i + 1}`).value = hcpIndex; });
+                } else {
+                    await setDoc(tournamentDocRef, { course: course });
+                }
+
+                if (unsubscribePlayers) unsubscribePlayers();
+                const playersCollectionRef = collection(tournamentDocRef, 'players');
+                unsubscribePlayers = onSnapshot(playersCollectionRef, (snapshot) => {
+                    const loadedPlayers = [];
+                    const loadedScores = {};
+                    snapshot.forEach(d => {
+                        const playerData = d.data();
+                        loadedPlayers.push(playerData);
+                        loadedScores[playerData.id] = playerData.scores || {};
+                    });
+                    players = loadedPlayers;
+                    scores = loadedScores;
+                    renderPlayers();
+                    renderScoresInput();
+                    calculateAndRenderLeaderboard();
+                    spinner.remove();
+                }, (error) => {
+                    console.error("Error listening to players:", error);
+                    showMessageBox("Fehler", "Fehler beim Laden der Spielerdaten.");
+                });
+
+                const savedMode = localStorage.getItem('golfStablefordCurrentMode') || 'player';
+                switchMode(savedMode);
+
+            } catch (e) {
+                console.error("Error loading tournament data:", e);
+                showMessageBox("Fehler", "Fehler beim Laden der Turnierdaten.");
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             initFirebase();
-            const savedMode = localStorage.getItem('golfStablefordCurrentMode') || 'player';
-            switchMode(savedMode);
+
+            passwordSubmitBtn.addEventListener('click', () => {
+                const enteredPassword = passwordInput.value;
+                if (passwordModal._submitCallback) {
+                    passwordModal._submitCallback(enteredPassword);
+                }
+                hidePasswordModal();
+            });
+
+            passwordCancelBtn.addEventListener('click', () => {
+                hidePasswordModal();
+            });
+
+            messageBoxCloseBtn.addEventListener('click', hideMessageBox);
+            messageBoxOverlay.addEventListener('click', hideMessageBox);
+            organizerModeBtnBottom.addEventListener('click', () => switchMode('organizer'));
+            playerModeBtn.addEventListener('click', () => switchMode('player'));
+
+            playerLoginBtn.addEventListener('click', () => {
+                const selectedPlayerId = playerSelect.value;
+                if (selectedPlayerId) {
+                    loginPlayer(selectedPlayerId);
+                } else {
+                    showMessageBox("Fehler", "Bitte wählen Sie einen Spieler aus der Liste aus.");
+                }
+            });
+
+            calculateScoresBtn.addEventListener('click', () => {
+                showMessageBox("Erfolg", "Rangliste aktualisiert.");
+            });
+
+            playerSaveScoresBtn.addEventListener('click', () => {
+                const activePlayer = players.find(p => p.id === activePlayerId);
+                if (activePlayer && typeof activePlayer.totalPoints === 'number') {
+                    let perHolePointsHtml = `
+                        <h4 class="text-lg font-semibold mt-4 mb-2">Ihre Stableford Punkte pro Loch:</h4>
+                        <p class="text-sm text-gray-600 mb-2">Die "Vorgabe" zeigt die zusätzlichen Schläge pro Loch, basierend auf Ihrer Spielvorgabe und dem Handicap-Index des Lochs.</p>
+                        <div class="table-container">
+                            <table class="w-full text-sm text-left text-gray-700">
+                                <thead class="text-xs text-gray-700 uppercase bg-gray-50 rounded-lg">
+                                    <tr>
+                                        <th scope="col" class="px-3 py-2">Loch</th>
+                                        <th scope="col" class="px-3 py-2 text-center">Par</th>
+                                        <th scope="col" class="px-3 py-2 text-center">Vorgabe</th>
+                                        <th scope="col" class="px-3 py-2 text-center">Schläge</th>
+                                        <th scope="col" class="px-3 py-2 text-center">Punkte</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
+                    const playingHandicap = calculatePlayingHandicap(activePlayer.handicap, course.courseRating, course.slopeRating, totalPar);
+                    for (let i = 1; i <= 18; i++) {
+                        const holePar = course.pars[i - 1];
+                        const holeHcpIndex = course.hcpIndices[i - 1];
+                        const grossScore = scores[activePlayer.id] && scores[activePlayer.id][`hole${i}`] ? parseInt(scores[activePlayer.id][`hole${i}`]) : NaN;
+                        const stablefordPoints = calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
+                        const handicapStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
+                        perHolePointsHtml += `
+                            <tr class="bg-white border-b hover:bg-gray-50">
+                                <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">Loch ${i}</td>
+                                <td class="px-3 py-2 text-center">${holePar}</td>
+                                <td class="px-3 py-2 text-center">${handicapStrokesForHole}</td>
+                                <td class="px-3 py-2 text-center">${isNaN(grossScore) ? '-' : grossScore}</td>
+                                <td class="px-3 py-2 text-center">${stablefordPoints}</td>
+                            </tr>
+                        `;
+                    }
+                    perHolePointsHtml += `
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-lg font-bold mt-4">Gesamt Stableford Punkte: ${activePlayer.totalPoints}</p>
+                    `;
+                    showMessageBox("Erfolg", perHolePointsHtml);
+                } else {
+                    showMessageBox("Erfolgreich", "Ihr Score wurde gespeichert.");
+                }
+            });
+
+            resetAllBtn.addEventListener('click', () => {
+                showMessageBox("Bestätigung", "Möchten Sie wirklich alle Turnierdaten zurücksetzen? Diese Aktion kann nicht rückgängig gemacht werden.");
+                messageBoxCloseBtn.onclick = () => {
+                    hideMessageBox();
+                    showPasswordModal((enteredPassword) => {
+                        if (enteredPassword === ORGANIZER_PASSWORD) {
+                            resetAllData();
+                            showMessageBox("Erfolgreich", "Alle Daten wurden zurückgesetzt.");
+                        } else {
+                            showMessageBox("Zugriff verweigert", "Falsches Passwort. Daten wurden nicht zurückgesetzt.");
+                        }
+                        messageBoxCloseBtn.onclick = hideMessageBox;
+                    });
+                };
+            });
         });
     </script>
 </body>
