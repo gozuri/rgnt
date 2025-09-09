@@ -854,41 +854,42 @@
                     const stablefordPoints = calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
                     const handicapStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
                     perHolePointsHtml += `
-                        <tr class="bg-white border-b hover:bg-gray-50">
-                            <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">Loch ${i}</td>
-                            <td class="px-3 py-2 text-center">${holePar}</td>
-                            <td class="px-3 py-2 text-center">${handicapStrokesForHole}</td>
-                            <td class="px-3 py-2 text-center">${isNaN(grossScore) ? '-' : grossScore}</td>
-                            <td class="px-3 py-2 text-center">${stablefordPoints}</td>
-                        </tr>
-                    `;
-                }
-                perHolePointsHtml += `
-                            </tbody>
-                        </table>
-                    </div>
-                    <p class="text-lg font-bold mt-4">Gesamt Stableford Punkte: ${activePlayer.totalPoints}</p>
-                `;
-                showMessageBox("Erfolg", perHolePointsHtml);
-            } else {
-                showMessageBox("Erfolgreich", "Ihr Score wurde gespeichert.");
-            }
-        });
-
-        resetAllBtn.addEventListener('click', () => {
-            showMessageBox("Bestätigung", "Möchten Sie wirklich alle Turnierdaten zurücksetzen? Diese Aktion kann nicht rückgängig gemacht werden.");
-            messageBoxCloseBtn.onclick = () => {
-                hideMessageBox();
-                showPasswordModal((enteredPassword) => {
-                    if (enteredPassword === ORGANIZER_PASSWORD) {
-                        resetAllData();
-                        showMessageBox("Erfolgreich", "Alle Daten wurden zurückgesetzt.");
-                    } else {
-                        showMessageBox("Zugriff verweigert", "Falsches Passwort. Daten wurden nicht zurückgesetzt.");
+                            <tr class="bg-white border-b hover:bg-gray-50">
+                                <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">Loch ${i}</td>
+                                <td class="px-3 py-2 text-center">${holePar}</td>
+                                <td class="px-3 py-2 text-center">${handicapStrokesForHole}</td>
+                                <td class="px-3 py-2 text-center">${isNaN(grossScore) ? '-' : grossScore}</td>
+                                <td class="px-3 py-2 text-center">${stablefordPoints}</td>
+                            </tr>
+                        `;
                     }
-                    messageBoxCloseBtn.onclick = hideMessageBox;
-                });
-            };
+                    perHolePointsHtml += `
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-lg font-bold mt-4">Gesamt Stableford Punkte: ${activePlayer.totalPoints}</p>
+                    `;
+                    showMessageBox("Erfolg", perHolePointsHtml);
+                } else {
+                    showMessageBox("Erfolgreich", "Ihr Score wurde gespeichert.");
+                }
+            });
+
+            resetAllBtn.addEventListener('click', () => {
+                showMessageBox("Bestätigung", "Möchten Sie wirklich alle Turnierdaten zurücksetzen? Diese Aktion kann nicht rückgängig gemacht werden.");
+                messageBoxCloseBtn.onclick = () => {
+                    hideMessageBox();
+                    showPasswordModal((enteredPassword) => {
+                        if (enteredPassword === ORGANIZER_PASSWORD) {
+                            resetAllData();
+                            showMessageBox("Erfolgreich", "Alle Daten wurden zurückgesetzt.");
+                        } else {
+                            showMessageBox("Zugriff verweigert", "Falsches Passwort. Daten wurden nicht zurückgesetzt.");
+                        }
+                        messageBoxCloseBtn.onclick = hideMessageBox;
+                    });
+                };
+            });
         });
 
         async function resetAllData() {
@@ -909,7 +910,6 @@
 
         async function initFirebase() {
             try {
-                // Hier fügen Sie Ihre Firebase-Konfiguration ein
                 const firebaseConfig = {
                     apiKey: "AIzaSyCk-XEKnnWqRlTqVXUFCxGc69JpmhErIT8",
                     authDomain: "rgnt-8105-stableford.firebaseapp.com",
@@ -974,14 +974,11 @@
                 const playersCollectionRef = collection(tournamentDocRef, 'players');
                 unsubscribePlayers = onSnapshot(playersCollectionRef, (snapshot) => {
                     const loadedPlayers = [];
-                    const loadedScores = {};
                     snapshot.forEach(d => {
                         const playerData = d.data();
                         loadedPlayers.push(playerData);
-                        loadedScores[playerData.id] = playerData.scores || {};
                     });
                     players = loadedPlayers;
-                    scores = loadedScores;
                     renderPlayers();
                     renderScoresInput();
                     calculateAndRenderLeaderboard();
@@ -992,7 +989,16 @@
                 });
 
                 const savedMode = localStorage.getItem('golfStablefordCurrentMode') || 'player';
-                switchMode(savedMode);
+                const savedPlayerId = localStorage.getItem('golfStablefordActivePlayerId');
+                if (savedMode === 'player' && savedPlayerId) {
+                    // Try to log in player automatically
+                    activePlayerId = savedPlayerId;
+                    switchMode('player');
+                    loginPlayer(activePlayerId);
+                } else {
+                    // Default to player mode
+                    switchMode('player');
+                }
 
             } catch (e) {
                 console.error("Error loading tournament data:", e);
@@ -1057,7 +1063,7 @@
                     for (let i = 1; i <= 18; i++) {
                         const holePar = course.pars[i - 1];
                         const holeHcpIndex = course.hcpIndices[i - 1];
-                        const grossScore = scores[activePlayer.id] && scores[activePlayer.id][`hole${i}`] ? parseInt(scores[activePlayer.id][`hole${i}`]) : NaN;
+                        const grossScore = activePlayer.scores && activePlayer.scores[`hole${i}`] ? parseInt(activePlayer.scores[`hole${i}`]) : NaN;
                         const stablefordPoints = calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
                         const handicapStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
                         perHolePointsHtml += `
