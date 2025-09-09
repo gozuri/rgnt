@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golf Stableford Rechner</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 1rem;
+            display: flex; /* Use flexbox for overall layout */
+            flex-direction: column; /* Stack children vertically */
+            min-height: 98vh; /* Ensure container takes full viewport height */
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #e2e8f0; /* Light border */
+        }
+        .input-group {
+            margin-bottom: 1rem;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #4a5568; /* Darker gray for labels */
+        }
+        .input-field {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #cbd5e0; /* Light gray border */
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            color: #2d3748; /* Dark text for inputs */
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #4299e1; /* Blue border on focus */
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5); /* Blue shadow on focus */
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            text-align: center;
+            white-space: nowrap;
+            border: none;
+        }
+        .btn-primary {
+            background-color: #4299e1; /* Blue */
+            color: #ffffff;
+            box-shadow: 0 4px 6px rgba(66, 153, 225, 0.3);
+        }
+        .btn-primary:hover {
+            background-color: #3182ce; /* Darker blue */
+            transform: translateY(-1px);
+        }
+        .btn-secondary {
+            background-color: #e2e8f0; /* Light gray */
+            color: #2d3748;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .btn-secondary:hover {
+            background-color: #cbd5e0; /* Darker light gray */
+            transform: translateY(-1px);
+        }
+        .btn-danger {
+            background-color: #ef4444; /* Red */
+            color: #ffffff;
+            box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
+        }
+        .btn-danger:hover {
+            background-color: #dc2626; /* Darker red */
+            transform: translateY(-1px);
+        }
+        .table-container {
+            overflow-x: auto;
+            margin-top: 1.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+        th, td {
+            padding: 0.75rem 0.5rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+            white-space: nowrap; /* Prevent wrapping in table cells */
+        }
+        th {
+            background-color: #f7fafc; /* Lighter background for headers */
+            font-weight: 700;
+            color: #2d3748;
+            position: sticky; /* Sticky header for horizontal scroll */
+            left: 0;
+            z-index: 10;
+        }
+        td:first-child, th:first-child {
+            position: sticky;
+            left: 0;
+            background-color: inherit; /* Ensure background matches parent */
+            z-index: 1; /* Keep player names visible */
+        }
+        td:first-child {
+            font-weight: 600;
+        }
+        .score-input {
+            width: 60px; /* Fixed width for score inputs */
+            text-align: center;
+            padding: 0.5rem;
+            border: 1px solid #cbd5e0;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+        }
+        .score-input:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.3);
+        }
+        .leaderboard-table th, .leaderboard-table td {
+            text-align: center;
+        }
+        .leaderboard-table td:first-child, .leaderboard-table th:first-child {
+            text-align: left;
+            position: static; /* No sticky for leaderboard */
+        }
+        .leaderboard-table tr:nth-child(odd) {
+            background-color: #fbfdff; /* Zebra striping */
+        }
+        .leaderboard-table tr:hover {
+            background-color: #edf2f7; /* Hover effect */
+        }
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            text-align: center;
+            max-width: 90%;
+            border: 1px solid #e2e8f0;
+            max-height: 80vh; /* Added: Max height for scrollability */
+            overflow-y: auto; /* Added: Enable vertical scrolling */
+        }
+        .message-box-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        .message-box h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #2d3748;
+        }
+        .message-box p {
+            margin-bottom: 1.5rem;
+            color: #4a5568;
+        }
+        /* New style for the bottom button container */
+        .bottom-button-container {
+            margin-top: auto; /* Pushes the container to the bottom */
+            padding-top: 1.5rem; /* Add some space above the button */
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Styles for the custom password modal */
+        #passwordModal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            z-index: 1001; /* Higher than messageBox */
+            text-align: center;
+            max-width: 90%;
+            width: 400px;
+            border: 1px solid #e2e8f0;
+        }
+        #passwordModal h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #2d3748;
+        }
+        #passwordModal input {
+            width: calc(100% - 2rem); /* Account for padding */
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #cbd5e0;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            text-align: center;
+        }
+        #passwordModal .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">🏌️ Stableford Rechner</h1>
+
+        <!-- Mode Selection - Player mode button remains at top -->
+        <div class="card flex justify-center gap-4 mb-6">
+            <button id="playerModeBtn" class="btn btn-primary">Spieler-Modus</button>
+        </div>
+
+        <!-- Nachrichtenbox für Bestätigungen/Fehler -->
+        <div id="messageBox" class="hidden message-box">
+            <h3 id="messageBoxTitle" class="font-bold"></h3>
+            <p id="messageBoxContent"></p>
+            <button id="messageBoxCloseBtn" class="btn btn-primary">OK</button>
+        </div>
+        <div id="messageBoxOverlay" class="hidden message-box-overlay"></div>
+
+        <!-- Custom Password Modal -->
+        <div id="passwordModal" class="hidden">
+            <h3>Organisator-Passwort</h3>
+            <input type="password" id="passwordInput" placeholder="Passwort eingeben">
+            <div class="button-group">
+                <button id="passwordSubmitBtn" class="btn btn-primary">Bestätigen</button>
+                <button id="passwordCancelBtn" class="btn btn-secondary">Abbrechen</button>
+            </div>
+        </div>
+
+        <!-- Organisator-Modus Inhalte -->
+        <div id="organizerContent" class="hidden"> <!-- Initially hidden -->
+            <!-- Turnier- und Platz-Setup -->
+            <div class="card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">1. Turnier & Platz Einstellungen</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label for="tournamentName">Turniername:</label>
+                        <input type="text" id="tournamentName" class="input-field" placeholder="Mein Golfturnier">
+                    </div>
+                    <div class="input-group">
+                        <label for="courseName">Golfplatzname:</label>
+                        <input type="text" id="courseName" class="input-field" placeholder="Golfpark Zürich">
+                    </div>
+                    <div class="input-group">
+                        <label for="courseRating">Course Rating (CR):</label>
+                        <input type="number" step="0.1" id="courseRating" class="input-field" value="72.0" min="50" max="80">
+                    </div>
+                    <div class="input-group">
+                        <label for="slopeRating">Slope Rating (SR):</label>
+                        <input type="number" id="slopeRating" class="input-field" value="120" min="55" max="155">
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold mt-6 mb-3 text-gray-700">Loch-Details (Par & Handicap Index)</h3>
+                <div class="table-container">
+                    <table id="courseDetailsTable">
+                        <thead>
+                            <tr>
+                                <th>Loch</th>
+                                <!-- Generate headers for holes 1-18 -->
+                                <script>
+                                    for (let i = 1; i <= 18; i++) {
+                                        document.write(`<th>${i}</th>`);
+                                    }
+                                </script>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Par</td>
+                                <!-- Input fields for Par -->
+                                <script>
+                                    for (let i = 1; i <= 18; i++) {
+                                        document.write(`<td><input type="number" id="par${i}" class="score-input" value="4" min="3" max="5"></td>`);
+                                    }
+                                </script>
+                            </tr>
+                            <tr>
+                                <td>HCP Index</td>
+                                <!-- Input fields for Handicap Index -->
+                                <script>
+                                    for (let i = 1; i <= 18; i++) {
+                                        document.write(`<td><input type="number" id="hcpIndex${i}" class="score-input" value="${i}" min="1" max="18"></td>`);
+                                    }
+                                </script>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <button id="saveCourseBtn" class="btn btn-primary mt-4 w-full">Platz-Einstellungen speichern</button>
+            </div>
+
+            <!-- Spieler hinzufügen -->
+            <div class="card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">2. Spieler hinzufügen</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label for="playerName">Spielername:</label>
+                        <input type="text" id="playerName" class="input-field" placeholder="Max Mustermann">
+                    </div>
+                    <div class="input-group">
+                        <label for="playerHandicap">Handicap Index (HCI):</label>
+                        <input type="number" step="0.1" id="playerHandicap" class="input-field" value="18.0" min="0" max="54">
+                    </div>
+                </div>
+                <button id="addPlayerBtn" class="btn btn-primary w-full mt-4">Spieler hinzufügen</button>
+
+                <h3 class="text-lg font-semibold mt-6 mb-3 text-gray-700">Aktuelle Spieler</h3>
+                <div class="table-container">
+                    <table id="playersTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>HCI</th>
+                                <th>Spielvorgabe</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Spieler werden hier dynamisch eingefügt -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Ergebnisse eingeben (Organisator-Ansicht) -->
+            <div class="card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">3. Ergebnisse eingeben (Organisator)</h2>
+                <p class="text-gray-600 mb-4">Geben Sie die Brutto-Schlagzahlen für jeden Spieler und jedes Loch ein.</p>
+                <div class="table-container">
+                    <table id="scoresTable">
+                        <thead>
+                            <tr>
+                                <th>Spieler</th>
+                                <!-- Generate headers for holes 1-18 -->
+                                <script>
+                                    for (let i = 1; i <= 18; i++) {
+                                        document.write(`<th>Loch ${i}</th>`);
+                                    }
+                                </script>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Spieler-Reihen werden hier dynamisch eingefügt -->
+                        </tbody>
+                    </table>
+                </div>
+                <button id="calculateScoresBtn" class="btn btn-primary w-full mt-4">Ergebnisse berechnen & Rangliste erstellen</button>
+            </div>
+        </div> <!-- End of organizerContent -->
+
+        <!-- Spieler-Modus Inhalte -->
+        <div id="playerContent"> <!-- Initially visible -->
+            <div class="card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700" id="playerWelcomeMessage"></h2>
+                <div class="input-group">
+                    <label for="playerSelect">Wählen Sie Ihren Namen:</label>
+                    <select id="playerSelect" class="input-field">
+                        <option value="">-- Spieler auswählen --</option>
+                    </select>
+                </div>
+                <button id="playerLoginBtn" class="btn btn-primary w-full mt-4">Anmelden</button>
+
+                <h3 class="text-lg font-semibold mt-6 mb-3 text-gray-700">Ihre Ergebnisse eingeben</h3>
+                <div class="table-container">
+                    <table id="playerScoresTable">
+                        <thead>
+                            <tr>
+                                <th>Loch</th>
+                                <!-- Generate headers for holes 1-18 -->
+                                <script>
+                                    for (let i = 1; i <= 18; i++) {
+                                        document.write(`<th>${i}</th>`);
+                                    }
+                                </script>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr id="activePlayerScoreRow">
+                                <td>Schläge</td>
+                                <!-- Score inputs for active player will be inserted here -->
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <button id="playerSaveScoresBtn" class="btn btn-primary w-full mt-4">Mein Score speichern</button>
+            </div>
+        </div> <!-- End of playerContent -->
+
+        <!-- Rangliste (in beiden Modi sichtbar, aber Reset nur für Organisator) -->
+        <div class="card" id="leaderboardCard">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">4. Rangliste</h2>
+            <div class="table-container">
+                <table id="leaderboardTable" class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Rang</th>
+                            <th>Spieler</th>
+                            <th>HCI</th>
+                            <th>Spielvorgabe</th>
+                            <th>Gesamt Stableford Punkte</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rangliste wird hier dynamisch eingefügt -->
+                    </tbody>
+                </table>
+            </div>
+            <button id="resetAllBtn" class="btn btn-danger w-full mt-4 organizer-only">Alle Daten zurücksetzen</button>
+        </div>
+
+        <!-- Organisator-Modus Knopf ganz unten -->
+        <div class="bottom-button-container">
+            <button id="organizerModeBtnBottom" class="btn btn-secondary">Organisator-Modus</button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables for data
+        let course = {
+            tournamentName: '',
+            courseName: '',
+            courseRating: 72.0, // Standard Course Rating
+            slopeRating: 120,    // Standard Slope Rating
+            pars: Array(18).fill(4), // Standard-Par 4 for 18 holes
+            hcpIndices: Array.from({ length: 18 }, (_, i) => i + 1) // Standard-HCP-Index 1-18
+        };
+        let players = [];
+        let scores = {}; // Stores scores per player and hole: {playerId: {hole1: score, hole2: score, ...}}
+
+        // Mode management
+        let currentMode = 'player'; // 'organizer' or 'player'
+        let activePlayerId = null; // ID of the currently logged-in player in player mode
+        const ORGANIZER_PASSWORD = "8105"; // Define the password for organizer mode
+
+        // DOM elements
+        const organizerModeBtnBottom = document.getElementById('organizerModeBtnBottom'); // New bottom button
+        const playerModeBtn = document.getElementById('playerModeBtn');
+        const organizerContent = document.getElementById('organizerContent');
+        const playerContent = document.getElementById('playerContent');
+        const resetAllBtn = document.getElementById('resetAllBtn');
+        const leaderboardCard = document.getElementById('leaderboardCard'); // New: Reference to the leaderboard card
+
+        const tournamentNameInput = document.getElementById('tournamentName');
+        const courseNameInput = document.getElementById('courseName');
+        const courseRatingInput = document.getElementById('courseRating');
+        const slopeRatingInput = document.getElementById('slopeRating');
+        const saveCourseBtn = document.getElementById('saveCourseBtn');
+        const courseDetailsTable = document.getElementById('courseDetailsTable');
+
+        const playerNameInput = document.getElementById('playerName');
+        const playerHandicapInput = document.getElementById('playerHandicap');
+        const addPlayerBtn = document.getElementById('addPlayerBtn');
+        const playersTableBody = document.querySelector('#playersTable tbody');
+
+        const scoresTableBody = document.querySelector('#scoresTable tbody'); // For organizer view
+        const calculateScoresBtn = document.getElementById('calculateScoresBtn'); // For organizer view
+
+        const playerWelcomeMessage = document.getElementById('playerWelcomeMessage');
+        const playerSelect = document.getElementById('playerSelect'); // New: Player select dropdown
+        const playerLoginBtn = document.getElementById('playerLoginBtn'); // New: Player login button
+        const activePlayerScoreRow = document.getElementById('activePlayerScoreRow');
+        const playerSaveScoresBtn = document.getElementById('playerSaveScoresBtn'); // Renamed from playerCalculateScoresBtn
+
+        const leaderboardTableBody = document.querySelector('#leaderboardTable tbody');
+
+        const messageBox = document.getElementById('messageBox');
+        const messageBoxOverlay = document.getElementById('messageBoxOverlay');
+        const messageBoxTitle = document.getElementById('messageBoxTitle');
+        const messageBoxContent = document.getElementById('messageBoxContent');
+        const messageBoxCloseBtn = document.getElementById('messageBoxCloseBtn');
+
+        // Password Modal elements
+        const passwordModal = document.getElementById('passwordModal');
+        const passwordInput = document.getElementById('passwordInput');
+        const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
+        const passwordCancelBtn = document.getElementById('passwordCancelBtn');
+
+        // --- Helper functions ---
+
+        /**
+         * Displays a custom message box.
+         * @param {string} title - Title of the message.
+         * @param {string} content - Content of the message.
+         */
+        function showMessageBox(title, content) {
+            messageBoxTitle.textContent = title;
+            messageBoxContent.innerHTML = content; // Changed to innerHTML to allow HTML content
+            messageBox.classList.remove('hidden');
+            messageBoxOverlay.classList.remove('hidden');
+        }
+
+        /**
+         * Hides the message box.
+         */
+        function hideMessageBox() {
+            messageBox.classList.add('hidden');
+            messageBoxOverlay.classList.add('hidden');
+        }
+
+        /**
+         * Displays the custom password modal.
+         * @param {function} callback - Function to call with the password if submitted.
+         */
+        function showPasswordModal(callback) {
+            passwordInput.value = ''; // Clear previous input
+            passwordModal.classList.remove('hidden');
+            messageBoxOverlay.classList.remove('hidden'); // Use the same overlay
+            passwordInput.focus(); // Focus the input field
+
+            // Store the callback for later use
+            passwordModal._submitCallback = callback;
+        }
+
+        /**
+         * Hides the custom password modal.
+         */
+        function hidePasswordModal() {
+            passwordModal.classList.add('hidden');
+            messageBoxOverlay.classList.add('hidden');
+            passwordModal._submitCallback = null; // Clear callback
+        }
+
+        /**
+         * Handles password submission from the custom modal.
+         */
+        passwordSubmitBtn.addEventListener('click', () => {
+            const enteredPassword = passwordInput.value;
+            if (passwordModal._submitCallback) {
+                passwordModal._submitCallback(enteredPassword);
+            }
+            hidePasswordModal();
+        });
+
+        /**
+         * Handles password modal cancellation.
+         */
+        passwordCancelBtn.addEventListener('click', () => {
+            hidePasswordModal();
+            // If the user cancels the password prompt for organizer mode,
+            // ensure they stay in player mode or the previous mode.
+            // This is handled by not calling switchMode('organizer') if cancelled.
+        });
+
+
+        /**
+         * Saves all application data to localStorage.
+         */
+        function saveData() {
+            try {
+                localStorage.setItem('golfStablefordCourse', JSON.stringify(course));
+                localStorage.setItem('golfStablefordPlayers', JSON.stringify(players));
+                localStorage.setItem('golfStablefordScores', JSON.stringify(scores));
+                localStorage.setItem('golfStablefordCurrentMode', currentMode);
+                localStorage.setItem('golfStablefordActivePlayerId', activePlayerId);
+            } catch (e) {
+                console.error("Error saving data:", e);
+                showMessageBox("Speicherfehler", "Die Daten konnten nicht gespeichert werden. Bitte überprüfen Sie den verfügbaren Speicherplatz oder die Browser-Einstellungen.");
+            }
+        }
+
+        /**
+         * Loads all application data from localStorage.
+         */
+        function loadData() {
+            try {
+                const savedCourse = localStorage.getItem('golfStablefordCourse');
+                const savedPlayers = localStorage.getItem('golfStablefordPlayers');
+                const savedScores = localStorage.getItem('golfStablefordScores');
+                const savedMode = localStorage.getItem('golfStablefordCurrentMode');
+                const savedPlayerId = localStorage.getItem('golfStablefordActivePlayerId');
+
+                if (savedCourse) {
+                    const loadedCourse = JSON.parse(savedCourse);
+                    course.tournamentName = loadedCourse.tournamentName || '';
+                    course.courseName = loadedCourse.courseName || '';
+                    course.courseRating = loadedCourse.courseRating !== undefined ? loadedCourse.courseRating : 72.0;
+                    course.slopeRating = loadedCourse.slopeRating !== undefined ? loadedCourse.slopeRating : 120;
+                    course.pars = loadedCourse.pars || Array(18).fill(4);
+                    course.hcpIndices = loadedCourse.hcpIndices || Array.from({ length: 18 }, (_, i) => i + 1);
+
+                    tournamentNameInput.value = course.tournamentName;
+                    courseNameInput.value = course.courseName;
+                    courseRatingInput.value = course.courseRating;
+                    slopeRatingInput.value = course.slopeRating;
+
+                    course.pars.forEach((par, i) => {
+                        const input = document.getElementById(`par${i + 1}`);
+                        if (input) input.value = par;
+                    });
+                    course.hcpIndices.forEach((hcpIndex, i) => {
+                        const input = document.getElementById(`hcpIndex${i + 1}`);
+                        if (input) input.value = hcpIndex;
+                    });
+                }
+                if (savedPlayers) {
+                    players = JSON.parse(savedPlayers);
+                }
+                if (savedScores) {
+                    scores = JSON.parse(savedScores);
+                }
+                if (savedMode) {
+                    currentMode = savedMode;
+                }
+                if (savedPlayerId) {
+                    activePlayerId = savedPlayerId;
+                }
+            } catch (e) {
+                console.error("Error loading data:", e);
+                showMessageBox("Ladefehler", "Die Daten konnten nicht geladen werden. Gespeicherte Daten könnten beschädigt sein.");
+            }
+        }
+
+        /**
+         * Switches the display mode (Organizer / Player) and updates UI accordingly.
+         * @param {string} mode - The mode to activate ('organizer' or 'player').
+         */
+        function switchMode(mode) {
+            if (mode === 'organizer') {
+                showPasswordModal((enteredPassword) => {
+                    if (enteredPassword === ORGANIZER_PASSWORD) {
+                        currentMode = 'organizer';
+                        saveData(); // Save the new mode
+                        organizerContent.classList.remove('hidden');
+                        playerContent.classList.add('hidden');
+                        resetAllBtn.classList.remove('hidden');
+                        leaderboardCard.classList.remove('hidden');
+
+                        playerModeBtn.classList.add('btn-secondary');
+                        playerModeBtn.classList.remove('btn-primary');
+                        organizerModeBtnBottom.classList.add('btn-primary');
+                        organizerModeBtnBottom.classList.remove('btn-secondary');
+
+                        activePlayerId = null;
+                        renderPlayers();
+                        renderScoresInput();
+                        showMessageBox("Erfolgreich", "Organisator-Modus aktiviert.");
+                    } else {
+                        showMessageBox("Zugriff verweigert", "Falsches Passwort. Sie können den Organisator-Modus nicht betreten.");
+                    }
+                });
+                return; // Exit here, as the modal callback will handle the rest
+            }
+
+            // If not switching to organizer mode, proceed directly
+            currentMode = mode;
+            saveData();
+
+            if (currentMode === 'player') {
+                organizerContent.classList.add('hidden');
+                playerContent.classList.remove('hidden');
+                resetAllBtn.classList.add('hidden');
+                leaderboardCard.classList.add('hidden');
+
+                playerModeBtn.classList.add('btn-primary');
+                playerModeBtn.classList.remove('btn-secondary');
+                organizerModeBtnBottom.classList.add('btn-secondary');
+                organizerModeBtnBottom.classList.remove('btn-primary');
+
+                populatePlayerSelect();
+
+                if (activePlayerId) {
+                    const player = players.find(p => p.id === activePlayerId);
+                    if (player) {
+                        playerSelect.value = activePlayerId;
+                        loginPlayer(activePlayerId);
+                        return;
+                    }
+                }
+                playerWelcomeMessage.textContent = "Bitte wählen Sie Ihren Namen und melden Sie sich an.";
+                activePlayerScoreRow.innerHTML = '<td>Schläge</td>';
+                playerSaveScoresBtn.disabled = true;
+            }
+        }
+
+        /**
+         * Populates the player selection dropdown.
+         */
+        function populatePlayerSelect() {
+            playerSelect.innerHTML = '<option value="">-- Spieler auswählen --</option>';
+            players.forEach(player => {
+                const option = document.createElement('option');
+                option.value = player.id;
+                option.textContent = player.name;
+                playerSelect.appendChild(option);
+            });
+        }
+
+        /**
+         * Logs in a player based on their ID from the dropdown.
+         * @param {string} playerId - The ID of the player to log in.
+         */
+        function loginPlayer(playerId) {
+            const player = players.find(p => p.id === playerId);
+            if (player) {
+                activePlayerId = player.id;
+                playerWelcomeMessage.textContent = `Willkommen, ${player.name}!`;
+                renderPlayerScoresInput(player); // Render scores for the active player
+                playerSaveScoresBtn.disabled = false; // Enable save button
+                showMessageBox("Erfolgreich", `Willkommen, ${player.name}!`);
+                saveData(); // Save active player
+            } else {
+                activePlayerId = null; // Reset active player
+                playerWelcomeMessage.textContent = "Bitte wählen Sie Ihren Namen und melden Sie sich an.";
+                activePlayerScoreRow.innerHTML = '<td>Schläge</td>'; // Clear score inputs
+                playerSaveScoresBtn.disabled = true; // Disable save button
+                showMessageBox("Fehler", "Spieler nicht gefunden. Bitte wählen Sie einen gültigen Spieler.");
+                saveData(); // Save state
+            }
+        }
+
+        /**
+         * Calculates the playing handicap of a player.
+         * Formula: (Handicap Index * (Slope Rating / 113)) + (Course Rating - Par)
+         * The result is rounded.
+         * @param {number} handicapIndex - The player's Handicap Index.
+         * @param {number} courseRating - The course's Course Rating.
+         * @param {number} slopeRating - The course's Slope Rating.
+         * @param {number} totalPar - The sum of Par values for all 18 holes.
+         * @returns {number} The calculated playing handicap.
+         */
+        function calculatePlayingHandicap(handicapIndex, courseRating, slopeRating, totalPar) {
+            const playingHandicapRaw = (handicapIndex * (slopeRating / 113)) + (courseRating - totalPar);
+            // Round to the nearest integer
+            const playingHandicap = Math.round(playingHandicapRaw);
+            return playingHandicap;
+        }
+
+        /**
+         * Calculates the number of handicap strokes a player receives on a specific hole.
+         * Based on the playing handicap and the hole's handicap index.
+         * @param {number} playingHandicap - The player's calculated playing handicap.
+         * @param {number} holeHandicapIndex - The hole's handicap index (1-18).
+         * @returns {number} The number of additional strokes the player receives on this hole.
+         */
+        function getHandicapStrokesPerHole(playingHandicap, holeHandicapIndex) {
+            const baseStrokes = Math.floor(playingHandicap / 18);
+            const remainingStrokes = playingHandicap % 18;
+            // Additional stroke if the hole's handicap index is within the remaining strokes
+            return baseStrokes + (holeHandicapIndex <= remainingStrokes ? 1 : 0);
+        }
+
+        /**
+         * Calculates Stableford points for a single hole.
+         * @param {number} grossScore - The player's gross score on this hole.
+         * @param {number} holePar - The hole's Par.
+         * @param {number} playingHandicap - The player's playing handicap.
+         * @param {number} holeHandicapIndex - The hole's handicap index.
+         * @returns {number} The Stableford points for this hole.
+         */
+        function calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHandicapIndex) {
+            if (isNaN(grossScore) || grossScore <= 0) {
+                return 0; // No points if no valid score was entered
+            }
+
+            const netStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHandicapIndex);
+            const netParForHole = holePar + netStrokesForHole;
+
+            // Stableford formula: 2 + (Net-Par - Gross Score)
+            // Points are at least 0
+            return Math.max(0, 2 + (netParForHole - grossScore));
+        }
+
+        /**
+         * Updates the display of the player list in organizer mode.
+         */
+        function renderPlayers() {
+            playersTableBody.innerHTML = '';
+            const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
+
+            players.forEach((player, index) => {
+                const playingHandicap = calculatePlayingHandicap(
+                    player.handicap,
+                    course.courseRating,
+                    course.slopeRating,
+                    totalPar
+                );
+                // Store the calculated playing handicap in the player object for display
+                player.playingHandicap = playingHandicap;
+
+                const row = playersTableBody.insertRow();
+                row.innerHTML = `
+                    <td>${player.name}</td>
+                    <td>${player.handicap.toFixed(1)}</td>
+                    <td>${player.playingHandicap}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" data-player-id="${player.id}">Entfernen</button>
+                    </td>
+                `;
+                row.querySelector('button').addEventListener('click', (e) => removePlayer(e.target.dataset.playerId));
+            });
+            saveData(); // Save the updated player data (incl. playing handicap)
+        }
+
+        /**
+         * Updates the display of score input fields in organizer mode.
+         */
+        function renderScoresInput() {
+            scoresTableBody.innerHTML = '';
+            players.forEach(player => {
+                const row = scoresTableBody.insertRow();
+                row.innerHTML = `<td>${player.name}</td>`;
+                for (let i = 1; i <= 18; i++) {
+                    const cell = row.insertCell();
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = '1'; // Minimum score
+                    input.max = '15'; // Realistic max score per hole
+                    input.className = 'score-input';
+                    input.id = `score-${player.id}-hole${i}`;
+                    input.value = scores[player.id] && scores[player.id][`hole${i}`] ? scores[player.id][`hole${i}`] : '';
+                    input.addEventListener('change', (e) => saveScore(player.id, i, parseInt(e.target.value)));
+                    cell.appendChild(input);
+                }
+            });
+        }
+
+        /**
+         * Renders the score input fields for the currently active player in player mode.
+         * @param {object} player - The player object of the active player.
+         */
+        function renderPlayerScoresInput(player) {
+            activePlayerScoreRow.innerHTML = '<td>Schläge</td>'; // Reset row content
+            for (let i = 1; i <= 18; i++) {
+                const cell = document.createElement('td');
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.min = '1';
+                input.max = '15';
+                input.className = 'score-input';
+                input.id = `player-score-${player.id}-hole${i}`;
+                input.value = scores[player.id] && scores[player.id][`hole${i}`] ? scores[player.id][`hole${i}`] : '';
+                input.addEventListener('change', (e) => saveScore(player.id, i, parseInt(e.target.value)));
+                cell.appendChild(input);
+                activePlayerScoreRow.appendChild(cell);
+            }
+        }
+
+        /**
+         * Calculates Stableford points for all players and updates the leaderboard.
+         */
+        function calculateAndRenderLeaderboard() {
+            const leaderboardData = [];
+            const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
+
+            players.forEach(player => {
+                let totalStablefordPoints = 0;
+                let playerScores = scores[player.id] || {};
+
+                // Calculate playing handicap for the player
+                const playingHandicap = calculatePlayingHandicap(
+                    player.handicap,
+                    course.courseRating,
+                    course.slopeRating,
+                    totalPar
+                );
+
+                for (let i = 1; i <= 18; i++) {
+                    const holePar = course.pars[i - 1];
+                    const holeHcpIndex = course.hcpIndices[i - 1];
+                    const grossScore = parseInt(playerScores[`hole${i}`]);
+
+                    if (!isNaN(grossScore) && grossScore > 0) {
+                        totalStablefordPoints += calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
+                    }
+                }
+                // Update the player object in the 'players' array with the calculated total points
+                player.totalPoints = totalStablefordPoints; // THIS IS THE KEY FIX
+                leaderboardData.push({
+                    name: player.name,
+                    handicap: player.handicap,
+                    playingHandicap: playingHandicap,
+                    totalPoints: totalStablefordPoints
+                });
+            });
+
+            // Sort leaderboard by points in descending order
+            leaderboardData.sort((a, b) => b.totalPoints - a.totalPoints);
+
+            // Render leaderboard
+            leaderboardTableBody.innerHTML = '';
+            leaderboardData.forEach((player, index) => {
+                const row = leaderboardTableBody.insertRow();
+                row.innerHTML = `
+                    <td>${index + 1}.</td>
+                    <td>${player.name}</td>
+                    <td>${player.handicap.toFixed(1)}</td>
+                    <td>${player.playingHandicap}</td>
+                    <td>${player.totalPoints}</td>
+                `;
+            });
+
+            if (leaderboardData.length === 0) {
+                const row = leaderboardTableBody.insertRow();
+                row.innerHTML = `<td colspan="5" class="text-center text-gray-500 py-4">Noch keine Ergebnisse vorhanden.</td>`;
+            }
+            saveData(); // Save the updated leaderboard (implicitly through scores and players)
+        }
+
+        // --- Event handlers ---
+
+        /**
+         * Saves course details (tournament name, course name, Par, HCP Index, Course Rating, Slope Rating).
+         */
+        saveCourseBtn.addEventListener('click', () => {
+            course.tournamentName = tournamentNameInput.value.trim();
+            course.courseName = courseNameInput.value.trim();
+            course.courseRating = parseFloat(courseRatingInput.value);
+            course.slopeRating = parseInt(slopeRatingInput.value);
+
+            const newPars = [];
+            const newHcpIndices = [];
+            let isValid = true;
+
+            if (isNaN(course.courseRating) || course.courseRating < 50 || course.courseRating > 80) {
+                showMessageBox("Fehler", "Bitte geben Sie ein gültiges Course Rating (z.B. 72.0) ein.");
+                isValid = false;
+            } else if (isNaN(course.slopeRating) || course.slopeRating < 55 || course.slopeRating > 155) {
+                showMessageBox("Fehler", "Bitte geben Sie ein gültiges Slope Rating (55-155) ein.");
+                isValid = false;
+            }
+
+            if (isValid) {
+                for (let i = 1; i <= 18; i++) {
+                    const parInput = document.getElementById(`par${i}`);
+                    const hcpIndexInput = document.getElementById(`hcpIndex${i}`);
+                    const par = parseInt(parInput.value);
+                    const hcpIndex = parseInt(hcpIndexInput.value);
+
+                    if (isNaN(par) || par < 3 || par > 5) {
+                        showMessageBox("Fehler", `Bitte geben Sie für Loch ${i} ein gültiges Par (3-5) ein.`);
+                        isValid = false;
+                        break;
+                    }
+                    if (isNaN(hcpIndex) || hcpIndex < 1 || hcpIndex > 18) {
+                        showMessageBox("Fehler", `Bitte geben Sie für Loch ${i} einen gültigen HCP Index (1-18) ein.`);
+                        isValid = false;
+                        break;
+                    }
+                    newPars.push(par);
+                    newHcpIndices.push(hcpIndex);
+                }
+            }
+
+            if (isValid) {
+                // Check if HCP Indices are unique and contain all values from 1 to 18
+                const uniqueHcpIndices = new Set(newHcpIndices);
+                if (uniqueHcpIndices.size !== 18) {
+                    showMessageBox("Fehler", "Die HCP Indices müssen einzigartig sein und alle Werte von 1 bis 18 enthalten.");
+                    isValid = false;
+                } else {
+                    course.pars = newPars;
+                    course.hcpIndices = newHcpIndices;
+                    saveData();
+                    renderPlayers(); // Update player list as playing handicap might change
+                    calculateAndRenderLeaderboard(); // Update leaderboard
+                    showMessageBox("Erfolgreich", "Platz-Einstellungen gespeichert!");
+                }
+            }
+        });
+
+        /**
+         * Adds a new player.
+         */
+        addPlayerBtn.addEventListener('click', () => {
+            const name = playerNameInput.value.trim();
+            const handicap = parseFloat(playerHandicapInput.value);
+
+            if (!name) {
+                showMessageBox("Fehler", "Bitte geben Sie einen Spielernamen ein.");
+                return;
+            }
+            if (isNaN(handicap) || handicap < 0 || handicap > 54) {
+                showMessageBox("Fehler", "Bitte geben Sie einen gültigen Handicap Index (0.0-54.0) ein.");
+                return;
+            }
+            if (players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+                showMessageBox("Fehler", "Ein Spieler mit diesem Namen existiert bereits. Bitte wählen Sie einen anderen Namen.");
+                return;
+            }
+
+            const newPlayer = {
+                id: Date.now().toString(), // Unique ID
+                name: name,
+                handicap: handicap,
+                playingHandicap: 0 // Will be calculated in renderPlayers
+            };
+            players.push(newPlayer);
+            scores[newPlayer.id] = {}; // Initialize empty scores for the new player
+            saveData();
+            renderPlayers();
+            renderScoresInput(); // Ensure organizer score input is updated with new player
+            playerNameInput.value = '';
+            playerHandicapInput.value = '18.0'; // Reset to default value
+            showMessageBox("Erfolgreich", `${name} wurde hinzugefügt.`);
+        });
+
+        /**
+         * Removes a player.
+         * @param {string} playerId - The ID of the player to remove.
+         */
+        function removePlayer(playerId) {
+            players = players.filter(player => player.id !== playerId);
+            delete scores[playerId]; // Also remove player's scores
+            saveData();
+            renderPlayers();
+            renderScoresInput(); // Ensure organizer score input is updated after removal
+            calculateAndRenderLeaderboard(); // Update leaderboard
+            showMessageBox("Erfolgreich", "Spieler wurde entfernt.");
+        }
+
+        /**
+         * Saves the entered score for a hole.
+         * @param {string} playerId - The player's ID.
+         * @param {number} holeNumber - The hole number (1-18).
+         * @param {number} score - The entered score.
+         */
+        function saveScore(playerId, holeNumber, score) {
+            if (!scores[playerId]) {
+                scores[playerId] = {};
+            }
+            scores[playerId][`hole${holeNumber}`] = score;
+            saveData();
+        }
+
+        // Event listener for the message box
+        messageBoxCloseBtn.addEventListener('click', hideMessageBox);
+        messageBoxOverlay.addEventListener('click', hideMessageBox); // Closes on overlay click
+
+        // Event listeners for mode switching
+        organizerModeBtnBottom.addEventListener('click', () => switchMode('organizer')); // Bottom button
+        playerModeBtn.addEventListener('click', () => switchMode('player'));
+
+        // Event listener for player login in player mode
+        playerLoginBtn.addEventListener('click', () => {
+            const selectedPlayerId = playerSelect.value;
+            if (selectedPlayerId) {
+                loginPlayer(selectedPlayerId);
+            } else {
+                showMessageBox("Fehler", "Bitte wählen Sie einen Spieler aus der Liste aus.");
+            }
+        });
+
+        // Event listeners for calculation buttons
+        calculateScoresBtn.addEventListener('click', calculateAndRenderLeaderboard); // Organizer
+        playerSaveScoresBtn.addEventListener('click', () => { // Player save button
+            calculateAndRenderLeaderboard(); // Recalculate and save all data
+
+            const activePlayer = players.find(p => p.id === activePlayerId);
+            if (activePlayer && typeof activePlayer.totalPoints === 'number') {
+                let perHolePointsHtml = `
+                    <h4 class="text-lg font-semibold mt-4 mb-2">Ihre Stableford Punkte pro Loch:</h4>
+                    <p class="text-sm text-gray-600 mb-2">Die "Vorgabe" zeigt die zusätzlichen Schläge pro Loch, basierend auf Ihrer Spielvorgabe und dem Handicap-Index des Lochs.</p>
+                    <div class="table-container">
+                        <table class="w-full text-sm text-left text-gray-700">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50 rounded-lg">
+                                <tr>
+                                    <th scope="col" class="px-3 py-2">Loch</th>
+                                    <th scope="col" class="px-3 py-2 text-center">Par</th>
+                                    <th scope="col" class="px-3 py-2 text-center">Vorgabe</th>
+                                    <th scope="col" class="px-3 py-2 text-center">Schläge</th>
+                                    <th scope="col" class="px-3 py-2 text-center">Punkte</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
+                const playingHandicap = calculatePlayingHandicap(
+                    activePlayer.handicap,
+                    course.courseRating,
+                    course.slopeRating,
+                    totalPar
+                );
+
+                for (let i = 1; i <= 18; i++) {
+                    const holePar = course.pars[i - 1];
+                    const holeHcpIndex = course.hcpIndices[i - 1];
+                    const grossScore = scores[activePlayer.id] && scores[activePlayer.id][`hole${i}`] ? parseInt(scores[activePlayer.id][`hole${i}`]) : NaN;
+                    const stablefordPoints = calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
+                    const handicapStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
+
+
+                    perHolePointsHtml += `
+                        <tr class="bg-white border-b hover:bg-gray-50">
+                            <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">Loch ${i}</td>
+                            <td class="px-3 py-2 text-center">${holePar}</td>
+                            <td class="px-3 py-2 text-center">${handicapStrokesForHole}</td>
+                            <td class="px-3 py-2 text-center">${isNaN(grossScore) ? '-' : grossScore}</td>
+                            <td class="px-3 py-2 text-center">${stablefordPoints}</td>
+                        </tr>
+                    `;
+                }
+
+                perHolePointsHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-lg font-bold mt-4">Gesamt Stableford Punkte: ${activePlayer.totalPoints}</p>
+                `;
+
+                showMessageBox("Erfolg", perHolePointsHtml);
+            } else {
+                showMessageBox("Erfolgreich", "Ihr Score wurde gespeichert."); // Fallback
+            }
+        });
+
+        // Event listener for the reset button
+        resetAllBtn.addEventListener('click', () => {
+            showMessageBox(
+                "Bestätigung",
+                "Möchten Sie wirklich alle Turnierdaten zurücksetzen? Diese Aktion kann nicht rückgängig gemacht werden."
+            );
+            // Temporarily re-purpose the MessageBox's OK button for the reset process
+            messageBoxCloseBtn.onclick = () => {
+                hideMessageBox(); // Hide confirmation message box
+                showPasswordModal((enteredPassword) => {
+                    if (enteredPassword === ORGANIZER_PASSWORD) {
+                        resetAllData();
+                        showMessageBox("Erfolgreich", "Alle Daten wurden zurückgesetzt.");
+                    } else {
+                        showMessageBox("Zugriff verweigert", "Falsches Passwort. Daten wurden nicht zurückgesetzt.");
+                    }
+                    messageBoxCloseBtn.onclick = hideMessageBox; // Restore original function
+                });
+            };
+        });
+
+        /**
+         * Resets all application data.
+         */
+        function resetAllData() {
+            course = {
+                tournamentName: '',
+                courseName: '',
+                courseRating: 72.0,
+                slopeRating: 120,
+                pars: Array(18).fill(4),
+                hcpIndices: Array.from({ length: 18 }, (_, i) => i + 1)
+            };
+            players = [];
+            scores = {};
+            currentMode = 'organizer'; // After reset, always go to organizer mode
+            activePlayerId = null;
+
+            // Reset UI elements
+            tournamentNameInput.value = '';
+            courseNameInput.value = '';
+            courseRatingInput.value = course.courseRating;
+            slopeRatingInput.value = course.slopeRating;
+            course.pars.forEach((par, i) => {
+                const input = document.getElementById(`par${i + 1}`);
+                if (input) input.value = par;
+            });
+            course.hcpIndices.forEach((hcpIndex, i) => {
+                const input = document.getElementById(`hcpIndex${i + 1}`);
+                if (input) input.value = hcpIndex;
+            });
+            playerNameInput.value = '';
+            playerHandicapInput.value = '18.0';
+
+            saveData();
+            // After reset, set the mode again to correctly initialize the UI.
+            switchMode('organizer'); // This will ensure UI is correctly set to organizer mode
+        }
+
+        // Initialization on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            // Initial mode setup
+            switchMode(currentMode); // Use the currentMode loaded from localStorage
+        });
+    </script>
+</body>
+</html>
