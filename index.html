@@ -463,7 +463,6 @@
         let currentMode = 'player';
         let activePlayerId = null;
         const ORGANIZER_PASSWORD = "8105";
-        // Ihre Firebase-Konfiguration hier
         const firebaseConfig = {
             apiKey: "AIzaSyCk-XEKnnWqRlTqVXUFCxGc69JpmhErIT8",
             authDomain: "rgnt-8105-stableford.firebaseapp.com",
@@ -720,8 +719,7 @@
         async function addPlayerToDB(player) {
             if (!authReady) return;
             const playersCollectionRef = collection(tournamentDocRef, 'players');
-            const newPlayerDocRef = doc(playersCollectionRef, player.id);
-            await setDoc(newPlayerDocRef, player, { merge: true });
+            await setDoc(doc(playersCollectionRef, player.id), { name: player.name, handicap: player.handicap, scores: {} });
         }
 
         async function removePlayerFromDB(playerId) {
@@ -733,8 +731,7 @@
         async function saveScoreToDB(playerId, holeNumber, score) {
             if (!authReady) return;
             const playerDocRef = doc(collection(tournamentDocRef, 'players'), playerId);
-            const scoreKey = `scores.hole${holeNumber}`;
-            await setDoc(playerDocRef, { [scoreKey]: score }, { merge: true });
+            await setDoc(playerDocRef, { scores: { ...scores[playerId], [`hole${holeNumber}`]: score } }, { merge: true });
         }
 
         function attachEventListeners() {
@@ -770,32 +767,35 @@
 
             playerSaveScoresBtn.addEventListener('click', () => {
                 const activePlayer = players.find(p => p.id === activePlayerId);
-                if (activePlayer && typeof activePlayer.totalPoints === 'number') {
-                    let perHolePointsHtml = `
-                        <h4 class="text-lg font-semibold mt-4 mb-2">Ihre Stableford Punkte pro Loch:</h4>
-                        <p class="text-sm text-gray-600 mb-2">Die "Vorgabe" zeigt die zusätzlichen Schläge pro Loch, basierend auf Ihrer Spielvorgabe und dem Handicap-Index des Lochs.</p>
-                        <div class="table-container">
-                            <table class="w-full text-sm text-left text-gray-700">
-                                <thead class="text-xs text-gray-700 uppercase bg-gray-50 rounded-lg">
-                                    <tr>
-                                        <th scope="col" class="px-3 py-2">Loch</th>
-                                        <th scope="col" class="px-3 py-2 text-center">Par</th>
-                                        <th scope="col" class="px-3 py-2 text-center">Vorgabe</th>
-                                        <th scope="col" class="px-3 py-2 text-center">Schläge</th>
-                                        <th scope="col" class="px-3 py-2 text-center">Punkte</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                    `;
-                    const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
-                    const playingHandicap = calculatePlayingHandicap(activePlayer.handicap, course.courseRating, course.slopeRating, totalPar);
-                    for (let i = 1; i <= 18; i++) {
-                        const holePar = course.pars[i - 1];
-                        const holeHcpIndex = course.hcpIndices[i - 1];
-                        const grossScore = scores[activePlayer.id] && scores[activePlayer.id][`hole${i}`] ? parseInt(scores[activePlayer.id][`hole${i}`]) : NaN;
-                        const stablefordPoints = calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
-                        const handicapStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
-                        perHolePointsHtml += `
+                if (!activePlayer) return;
+
+                let perHolePointsHtml = `
+                    <h4 class="text-lg font-semibold mt-4 mb-2">Ihre Stableford Punkte pro Loch:</h4>
+                    <p class="text-sm text-gray-600 mb-2">Die "Vorgabe" zeigt die zusätzlichen Schläge pro Loch, basierend auf Ihrer Spielvorgabe und dem Handicap-Index des Lochs.</p>
+                    <div class="table-container">
+                        <table class="w-full text-sm text-left text-gray-700">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50 rounded-lg">
+                                <tr>
+                                    <th scope="col" class="px-3 py-2">Loch</th>
+                                    <th scope="col" class="px-3 py-2 text-center">Par</th>
+                                    <th scope="col" class="px-3 py-2 text-center">Vorgabe</th>
+                                    <th scope="col" class="px-3 py-2 text-center">Schläge</th>
+                                    <th scope="col" class="px-3 py-2 text-center">Punkte</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
+                const playingHandicap = calculatePlayingHandicap(activePlayer.handicap, course.courseRating, course.slopeRating, totalPar);
+                const playerScores = scores[activePlayer.id] || {};
+                const currentTotalPoints = players.find(p => p.id === activePlayerId)?.totalPoints || 0;
+                for (let i = 1; i <= 18; i++) {
+                    const holePar = course.pars[i - 1];
+                    const holeHcpIndex = course.hcpIndices[i - 1];
+                    const grossScore = playerScores[`hole${i}`] ? parseInt(playerScores[`hole${i}`]) : NaN;
+                    const stablefordPoints = calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
+                    const handicapStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
+                    perHolePointsHtml += `
                             <tr class="bg-white border-b hover:bg-gray-50">
                                 <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">Loch ${i}</td>
                                 <td class="px-3 py-2 text-center">${holePar}</td>
@@ -809,13 +809,10 @@
                                 </tbody>
                             </table>
                         </div>
-                        <p class="text-lg font-bold mt-4">Gesamt Stableford Punkte: ${activePlayer.totalPoints}</p>
+                        <p class="text-lg font-bold mt-4">Gesamt Stableford Punkte: ${currentTotalPoints}</p>
                     `;
                     showMessageBox("Erfolg", perHolePointsHtml);
-                } else {
-                    showMessageBox("Erfolgreich", "Ihr Score wurde gespeichert.");
-                }
-            });
+                });
 
             resetAllBtn.addEventListener('click', () => {
                 showMessageBox("Bestätigung", "Möchten Sie wirklich alle Turnierdaten zurücksetzen? Diese Aktion kann nicht rückgängig gemacht werden.");
@@ -918,11 +915,15 @@
                     const loadedScores = {};
                     snapshot.forEach(d => {
                         const playerData = d.data();
-                        loadedPlayers.push(playerData);
-                        loadedScores[d.id] = playerData.scores || {};
+                        loadedPlayers.push({ id: d.id, ...d.data() });
                     });
+
                     players = loadedPlayers;
-                    scores = loadedScores;
+
+                    const newScores = {};
+                    players.forEach(p => newScores[p.id] = p.scores || {});
+                    scores = newScores;
+
                     renderPlayers();
                     renderScoresInput();
                     calculateAndRenderLeaderboard();
