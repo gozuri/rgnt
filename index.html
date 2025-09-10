@@ -233,6 +233,8 @@
 <body class="p-4">
     <div class="container">
         <h1 id="title" class="text-3xl font-bold text-center mb-6 text-gray-800">🏌️ Stableford Rechner</h1>
+        <h3 id="title2" class="text-xl text-center mb-6 text-gray-800"></h3>
+
         <!-- Mode Selection - Player mode button remains at top -->
         <div class="card flex justify-center gap-4 mb-6">
             <button id="playerModeBtn" class="btn btn-primary">Spieler-Modus</button>
@@ -383,14 +385,14 @@
             <div class="card">
                 <h2 class="text-xl font-semibold mb-4 text-gray-700" id="playerWelcomeMessage"></h2>
                 <div class="input-group">
-                    <label for="playerSelect">Wählen Sie Ihren Namen:</label>
+                    <label for="playerSelect">Wähle Deine Namen:</label>
                     <select id="playerSelect" class="input-field">
                         <option value="">-- Spieler auswählen --</option>
                     </select>
                 </div>
                 <button id="playerLoginBtn" class="btn btn-primary w-full mt-4">Anmelden</button>
 
-                <h3 class="text-lg font-semibold mt-6 mb-3 text-gray-700">Ihre Ergebnisse eingeben</h3>
+                <h3 class="text-lg font-semibold mt-6 mb-3 text-gray-700">Deine Ergebnisse eingeben</h3>
                 <div class="table-container">
                     <table id="playerScoresTable">
                         <thead>
@@ -486,24 +488,6 @@
         const playerContent = document.getElementById('playerContent');
         const resetAllBtn = document.getElementById('resetAllBtn');
         const leaderboardCard = document.getElementById('leaderboardCard');
-        const tournamentNameInput = document.getElementById('tournamentName');
-        const titleEl = document.getElementById("title");
-
-        function updateTitle() {
-          const name = tournamentNameInput.value.trim();
-          titleEl.textContent = name
-            ? `🏌️ Stableford Rechner - ${name}!`
-            : "🏌️ Stableford Rechner";
-        }
-
-        // Update whenever user clicks anywhere on the page
-        document.addEventListener("click", updateTitle);
-
-        // Run once after 500ms delay on page load
-        setTimeout(updateTitle, 1000);
-        const courseNameInput = document.getElementById('courseName');
-        const courseRatingInput = document.getElementById('courseRating');
-        const slopeRatingInput = document.getElementById('slopeRating');
         const saveCourseBtn = document.getElementById('saveCourseBtn');
         const courseDetailsTable = document.getElementById('courseDetailsTable');
         const playerNameInput = document.getElementById('playerName');
@@ -532,6 +516,46 @@
         spinner.innerHTML = '<div class="w-16 h-16 border-4 border-blue-400 border-dashed rounded-full animate-spin"></div>';
         const syncScoresBtn = document.getElementById('syncScoresBtn');
         const liveScoreBtn = document.getElementById('liveScoreBtn');
+
+
+        const courseNameInput = document.getElementById('courseName');
+        const courseRatingInput = document.getElementById('courseRating');
+        const slopeRatingInput = document.getElementById('slopeRating');
+        const tournamentNameInput = document.getElementById('tournamentName');
+        const titleEl = document.getElementById("title");
+        const titleEl2 = document.getElementById("title2");
+
+        function updateTitle() {
+          const name = tournamentNameInput.value.trim();
+          titleEl.textContent = name
+            ? `🏌️ Stableford Rechner - ${name}!`
+            : "🏌️ Stableford Rechner";
+        }
+        function updateTitle2() {
+        const name2 = (courseNameInput?.value || '').trim();
+        const name3 = (courseRatingInput?.value || '').trim();
+        const name4 = (slopeRatingInput?.value || '').trim();
+
+        titleEl2.textContent = name2 || name3 || name4
+          ? `${name2} - CR: ${name3} - SR: ${name4}`
+          : ''; // or a default text you prefer
+      }
+
+      // Update on any click
+      document.addEventListener('click', () => {
+        updateTitle();
+        updateTitle2();
+      });
+
+      // Initial update after 500ms
+      setTimeout(() => {
+        updateTitle();
+        updateTitle2();
+      }, 500);
+
+
+
+
 
         function showMessageBox(title, content) {
             messageBoxTitle.textContent = title;
@@ -604,7 +628,7 @@
                 organizerModeBtnBottom.classList.add('btn-secondary');
                 organizerModeBtnBottom.classList.remove('btn-primary');
                 populatePlayerSelect();
-                playerWelcomeMessage.textContent = "Bitte wählen Sie Ihren Namen und melden Sie sich an.";
+                playerWelcomeMessage.textContent = "Bitte wählen Sie Deinen Namen und melden Sie sich an.";
                 activePlayerScoreRow.innerHTML = '<td>Schläge</td>';
                 playerSaveScoresBtn.disabled = true;
                 syncScoresBtn.disabled = true;
@@ -637,7 +661,7 @@
             } else {
                 activePlayerId = null;
                 localStorage.removeItem('golfStablefordActivePlayerId');
-                playerWelcomeMessage.textContent = "Bitte wählen Sie Ihren Namen und melden Sie sich an.";
+                playerWelcomeMessage.textContent = "Bitte wählen Sie Deinen Namen und melden Sie sich an.";
                 activePlayerScoreRow.innerHTML = '<td>Schläge</td>';
                 playerSaveScoresBtn.disabled = true;
                 syncScoresBtn.disabled = true;
@@ -841,7 +865,7 @@
             await setDoc(playerDocRef, { scores: scoresToSave }, { merge: true });
 
             if (showPopup) {
-                showMessageBox("Erfolg", `Ihr Score wurde erfolgreich synchronisiert!`);
+                showMessageBox("Erfolg", `Dein Score wurde erfolgreich synchronisiert!`);
             }
         }
 
@@ -1029,9 +1053,9 @@
                 return;
             }
 
+//          <h4 class="text-lg font-semibold mt-4 mb-2">Stableford Punkte:</h4>
             let perHolePointsHtml = `
-                <h4 class="text-lg font-semibold mt-4 mb-2">Ihre Stableford Punkte pro Loch:</h4>
-                <p class="text-sm text-gray-600 mb-2">Die "Vorgabe" zeigt die zusätzlichen Schläge pro Loch, basierend auf Ihrer Spielvorgabe und dem Handicap-Index des Lochs.</p>
+                <p class="text-sm text-gray-600 mb-2">Die "Vorgabe" zeigt die zusätzlichen Schläge pro Loch, basierend auf Deiner Spielvorgabe und dem Handicap-Index des Lochs.</p>
                 <div class="table-container">
                     <table class="w-full text-sm text-left text-gray-700">
                         <thead class="text-xs text-gray-700 uppercase bg-gray-50 rounded-lg">
@@ -1040,7 +1064,7 @@
                                 <th scope="col" class="px-3 py-2 text-center">Par</th>
                                 <th scope="col" class="px-3 py-2 text-center">Vorgabe</th>
                                 <th scope="col" class="px-3 py-2 text-center">Schläge</th>
-                                <th scope="col" class="px-3 py-2 text-center">Punkte</th>
+                                <th scope="col" class="px-3 py-2 text-center">Stableford</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1064,7 +1088,7 @@
                 const handicapStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
                 perHolePointsHtml += `
                     <tr class="bg-white border-b hover:bg-gray-50">
-                        <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">Loch ${i}</td>
+                        <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">${i}</td>
                         <td class="px-3 py-2 text-center">${holePar}</td>
                         <td class="px-3 py-2 text-center">${handicapStrokesForHole}</td>
                         <td class="px-3 py-2 text-center">${isNaN(grossScore) ? '-' : grossScore}</td>
@@ -1078,7 +1102,7 @@
                 </div>
                 <p class="text-lg font-bold mt-4">Gesamt Stableford Punkte: ${totalPoints}</p>
             `;
-            showMessageBox("Erfolg", perHolePointsHtml);
+            showMessageBox("Deine Scorecard", perHolePointsHtml);
         });
 
 
