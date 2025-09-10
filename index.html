@@ -232,8 +232,7 @@
 </head>
 <body class="p-4">
     <div class="container">
-        <h1 class="text-3xl font-bold text-center mb-6 text-gray-800">tournamentNameInput.value + "🏌️ Stableford Rechner"</h1>
-
+        <h1 id="title" class="text-3xl font-bold text-center mb-6 text-gray-800"> 🏌️ Stableford Rechner</h1>
         <!-- Mode Selection - Player mode button remains at top -->
         <div class="card flex justify-center gap-4 mb-6">
             <button id="playerModeBtn" class="btn btn-primary">Spieler-Modus</button>
@@ -488,6 +487,12 @@
         const resetAllBtn = document.getElementById('resetAllBtn');
         const leaderboardCard = document.getElementById('leaderboardCard');
         const tournamentNameInput = document.getElementById('tournamentName');
+        const titleEl = document.getElementById("title");
+
+        // Update title whenever input changes
+        tournamentNameInput.addEventListener("input", () => {
+          titleEl.textContent = `🏌️ Stableford Rechner - ${tournamentNameInput.value}!`;
+        });
         const courseNameInput = document.getElementById('courseName');
         const courseRatingInput = document.getElementById('courseRating');
         const slopeRatingInput = document.getElementById('slopeRating');
