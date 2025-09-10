@@ -232,7 +232,7 @@
 </head>
 <body class="p-4">
     <div class="container">
-        <h1 id="title" class="text-3xl font-bold text-center mb-6 text-gray-800"> 🏌️ Stableford Rechner</h1>
+        <h1 id="title" class="text-3xl font-bold text-center mb-6 text-gray-800">🏌️ Stableford Rechner</h1>
         <!-- Mode Selection - Player mode button remains at top -->
         <div class="card flex justify-center gap-4 mb-6">
             <button id="playerModeBtn" class="btn btn-primary">Spieler-Modus</button>
@@ -490,8 +490,8 @@
         const titleEl = document.getElementById("title");
 
         // Update title whenever input changes
-        tournamentNameInput.addEventListener("input", () => {
-          titleEl.textContent = `🏌️ Stableford Rechner - ${tournamentNameInput.value}!`;
+tournamentNameInput.addEventListener("input", () =>{
+          titleEl.textContent = `🏌️ Stableford Rechner - ${tournamentNameInput.value}`;
         });
         const courseNameInput = document.getElementById('courseName');
         const courseRatingInput = document.getElementById('courseRating');
@@ -977,7 +977,7 @@
             leaderboardData.sort((a, b) => b.totalPoints - a.totalPoints);
 
             let leaderboardHtml = `
-                <h4 class="text-lg font-semibold mt-4 mb-2">${course.tournamentName || "Live Rangliste"}</h4>
+                <h4 class="text-lg font-semibold mt-4 mb-2">${course.tournamentName || "Live Score"}</h4>
                 <div class="table-container">
                     <table class="w-full text-sm text-left text-gray-700">
                         <thead class="text-xs text-gray-700 uppercase bg-gray-50 rounded-lg">
@@ -1005,7 +1005,7 @@
                     </table>
                 </div>
             `;
-            showMessageBox("Live Rangliste", leaderboardHtml);
+            showMessageBox("Live Score", leaderboardHtml);
         });
 
         playerSaveScoresBtn.addEventListener('click', async () => {
