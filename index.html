@@ -489,10 +489,18 @@
         const tournamentNameInput = document.getElementById('tournamentName');
         const titleEl = document.getElementById("title");
 
-        // Update title whenever input changes
-tournamentNameInput.addEventListener("input", () =>{
-          titleEl.textContent = `🏌️ Stableford Rechner - ${tournamentNameInput.value}`;
-        });
+        function updateTitle() {
+          const name = tournamentNameInput.value.trim();
+          titleEl.textContent = name
+            ? `🏌️ Stableford Rechner - ${name}!`
+            : "🏌️ Stableford Rechner";
+        }
+
+        // Update whenever user clicks anywhere on the page
+        document.addEventListener("click", updateTitle);
+
+        // Run once after 500ms delay on page load
+        setTimeout(updateTitle, 1000);
         const courseNameInput = document.getElementById('courseName');
         const courseRatingInput = document.getElementById('courseRating');
         const slopeRatingInput = document.getElementById('slopeRating');
