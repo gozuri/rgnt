@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Golf Stableford Rechner</title>
+    <title>8105 Tour 2025</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -280,12 +280,22 @@
 </head>
 <body class="p-4">
     <div class="container">
-        <h1 id="title" class="text-3xl font-bold text-center mb-6 text-gray-800">🏌️ Stableford Rechner</h1>
-        <h3 id="title2" class="text-xl text-center mb-6 text-gray-800"></h3>
+        <h1 id="title" class="text-3xl font-bold text-center mb-2 text-gray-800">Turniername</h1>
+        <h3 id="title2" class="text-xl text-center mb-6 text-gray-600">8105 Tour 2025</h3>
 
-        <!-- Mode Selection - Player mode button remains at top -->
-        <div class="card flex justify-center gap-4 mb-6">
-            <button id="playerModeBtn" class="btn btn-primary">Spieler-Modus</button>
+        <!-- Mode Selection & Info Box -->
+        <div class="card flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+            <div id="infoBox" class="text-center sm:text-left">
+                <div id="courseInfoBox" class="hidden">
+                    <p id="courseNameInfo" class="font-bold text-gray-700"></p>
+                    <p id="courseRatingsInfo" class="text-sm text-gray-500"></p>
+                </div>
+                 <div id="playerInfoBox" class="hidden mt-2">
+                    <p id="playerNameInfo" class="font-bold text-blue-600"></p>
+                    <p id="playerEhcInfo" class="text-sm text-gray-500"></p>
+                </div>
+            </div>
+            <button id="playerModeBtn" class="btn btn-primary flex-shrink-0">Spieler-Modus</button>
         </div>
 
         <!-- Nachrichtenbox für Bestätigungen/Fehler -->
@@ -474,7 +484,7 @@
                             <tr class="text-xs text-gray-700 uppercase bg-gray-50">
                                 <th class="px-3 py-2 text-center">#</th>
                                 <th class="px-3 py-2 text-center">PAR</th>
-                                <th class="px-3 py-2 text-center">HC</th>
+                                <th class="px-3 py-2 text-center">HCP /</th>
                                 <th class="px-3 py-2 text-center">SCORE</th>
                             </tr>
                         </thead>
@@ -619,32 +629,52 @@
         const lockScoresToggle = document.getElementById('lockScoresToggle');
         const showLiveScoreToggle = document.getElementById('showLiveScoreToggle');
         const scoreLockMessage = document.getElementById('scoreLockMessage');
+        const courseInfoBox = document.getElementById('courseInfoBox');
+        const playerInfoBox = document.getElementById('playerInfoBox');
+        const courseNameInfo = document.getElementById('courseNameInfo');
+        const courseRatingsInfo = document.getElementById('courseRatingsInfo');
+        const playerNameInfo = document.getElementById('playerNameInfo');
+        const playerEhcInfo = document.getElementById('playerEhcInfo');
 
         // ===================================================================================
         // UI & DISPLAY FUNCTIONS
         // ===================================================================================
 
         /**
-         * Aktualisiert den Haupttitel der Seite mit dem Turniernamen.
+         * Aktualisiert die Haupttitel der Seite.
          */
-        function updateTitle() {
-          const name = tournamentNameInput.value.trim();
-          titleEl.textContent = name
-            ? `🏌️ Stableford Rechner - ${name}!`
-            : "🏌️ Stableford Rechner";
+        function updatePageTitles() {
+            const name = tournamentNameInput.value.trim();
+            titleEl.textContent = name || "Turniername";
+            titleEl2.textContent = "8105 Tour 2025";
         }
 
         /**
-         * Aktualisiert den Untertitel mit Platzdetails (Name, CR, SR).
+         * Aktualisiert die Info-Box mit Turnier- und Spielerdaten.
          */
-        function updateTitle2() {
-            const name2 = (courseNameInput?.value || '').trim();
-            const name3 = (courseRatingInput?.value || '').trim();
-            const name4 = (slopeRatingInput?.value || '').trim();
+        function updateInfoBox() {
+            // Kurs-Info aktualisieren
+            if (course.courseName) {
+                courseNameInfo.textContent = course.courseName;
+                courseRatingsInfo.textContent = `CR: ${course.courseRating} / SR: ${course.slopeRating}`;
+                courseInfoBox.classList.remove('hidden');
+            } else {
+                courseInfoBox.classList.add('hidden');
+            }
 
-            titleEl2.textContent = name2 || name3 || name4
-              ? `${name2} - CR: ${name3} - SR: ${name4}`
-              : '';
+            // Spieler-Info aktualisieren
+            if (activePlayerId) {
+                const player = players.find(p => p.id === activePlayerId);
+                if (player && course.pars) {
+                     const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
+                     const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
+                     playerNameInfo.textContent = player.name;
+                     playerEhcInfo.textContent = `PHC: ${player.handicap.toFixed(1)} / EHC: ${playingHandicap}`;
+                     playerInfoBox.classList.remove('hidden');
+                }
+            } else {
+                playerInfoBox.classList.add('hidden');
+            }
         }
 
         /**
@@ -742,6 +772,7 @@
                 playerSaveScoresBtn.disabled = true;
                 syncScoresBtn.disabled = true;
             }
+            updateInfoBox();
         }
 
         /**
@@ -786,6 +817,7 @@
                     showMessageBox("Fehler", "Spieler nicht gefunden. Bitte wählen Sie einen gültigen Spieler.");
                 }
             }
+            updateInfoBox();
         }
 
         /**
@@ -958,7 +990,7 @@
 
                 // Par und HC
                 row.insertCell().textContent = holePar;
-                row.insertCell().textContent = handicapStrokes;
+                row.insertCell().textContent = '/'.repeat(handicapStrokes);
 
                 // Score-Eingabe mit +/- Buttons
                 const cellScore = row.insertCell();
@@ -1493,7 +1525,7 @@
                             <tr>
                                 <th scope="col" class="px-3 py-2 text-center">#</th>
                                 <th scope="col" class="px-3 py-2 text-center">PAR</th>
-                                <th scope="col" class="px-3 py-2 text-center">HC</th>
+                                <th scope="col" class="px-3 py-2 text-center">HCP /</th>
                                 <th scope="col" class="px-3 py-2 text-center">SC</th>
                                 <th scope="col" class="px-3 py-2 text-center">SF</th>
                             </tr>
@@ -1533,7 +1565,7 @@
                     <tr class="bg-white border-b hover:bg-gray-50 text-center">
                         <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">#${i}</td>
                         <td class="px-3 py-2">${holePar}</td>
-                        <td class="px-3 py-2">${handicapStrokesForHole}</td>
+                        <td class="px-3 py-2">${'/'.repeat(handicapStrokesForHole) || '-'}</td>
                         <td class="px-3 py-2">${(!isNaN(grossScore) && grossScore > 0) ? grossScore : '-'}</td>
                         <td class="px-3 py-2 font-bold">${stablefordPoints}</td>
                     </tr>
@@ -1664,6 +1696,8 @@
                                     if (input) input.value = hcpIndex;
                                 });
 
+                                updatePageTitles();
+                                updateInfoBox();
                                 applyTournamentSettings();
                                 renderPlayers();
                                 calculateAndRenderLeaderboard();
@@ -1688,6 +1722,7 @@
                             renderScoresInput();
                             calculateAndRenderLeaderboard();
                             populatePlayerSelect();
+                            updateInfoBox();
 
                             const savedMode = localStorage.getItem('golfStablefordCurrentMode') || 'player';
                             const savedPlayerId = localStorage.getItem('golfStablefordActivePlayerId');
@@ -1748,11 +1783,9 @@
             });
 
 
-            // Listener, die auf Klicks warten
-            document.addEventListener('click', () => {
-                updateTitle();
-                updateTitle2();
-            });
+            // Listener für die live Titelaktualisierung
+            tournamentNameInput.addEventListener('input', updatePageTitles);
+
         });
     </script>
 </body>
