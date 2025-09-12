@@ -393,9 +393,22 @@
                 <button id="playerLoginBtn" class="btn btn-primary w-full mt-4">Anmelden</button>
 
                 <h3 class="text-lg font-semibold mt-6 mb-3 text-gray-700">Deine Ergebnisse eingeben</h3>
-                <div id="playerScoresGrid" class="grid grid-cols-3 sm:grid-cols-6 gap-4">
-                     <!-- Score inputs will be dynamically inserted here -->
+                <div class="table-container">
+                    <table id="playerScoresTable" class="w-full text-sm">
+                        <thead>
+                            <tr class="text-xs text-gray-700 uppercase bg-gray-50">
+                                <th class="px-3 py-2 text-center">Loch</th>
+                                <th class="px-3 py-2 text-center">Par</th>
+                                <th class="px-3 py-2 text-center">Vorgabe</th>
+                                <th class="px-3 py-2 text-center">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="playerScoresTableBody">
+                            <!-- Rows will be inserted by JS -->
+                        </tbody>
+                    </table>
                 </div>
+
                 <div class="flex flex-col sm:flex-row gap-4 mt-4">
                     <button id="syncScoresBtn" class="btn btn-primary w-full sm:w-1/2">Synchronisieren</button>
                     <button id="playerSaveScoresBtn" class="btn btn-secondary w-full sm:w-1/2">Meine Scorecard</button>
@@ -614,7 +627,7 @@
                 organizerModeBtnBottom.classList.remove('btn-primary');
                 populatePlayerSelect();
                 playerWelcomeMessage.textContent = "Bitte wählen Sie Deinen Namen und melden Sie sich an.";
-                document.getElementById('playerScoresGrid').innerHTML = '';
+                document.getElementById('playerScoresTableBody').innerHTML = '';
                 playerSaveScoresBtn.disabled = true;
                 syncScoresBtn.disabled = true;
             }
@@ -647,7 +660,7 @@
                 activePlayerId = null;
                 localStorage.removeItem('golfStablefordActivePlayerId');
                 playerWelcomeMessage.textContent = "Bitte wählen Sie Deinen Namen und melden Sie sich an.";
-                document.getElementById('playerScoresGrid').innerHTML = '';
+                document.getElementById('playerScoresTableBody').innerHTML = '';
                 playerSaveScoresBtn.disabled = true;
                 syncScoresBtn.disabled = true;
                 if (showWelcomeMessage) {
@@ -730,24 +743,46 @@
         }
 
         function renderPlayerScoresInput(player) {
-            const gridContainer = document.getElementById('playerScoresGrid');
-            gridContainer.innerHTML = ''; // Clear previous inputs
+            const tableBody = document.getElementById('playerScoresTableBody');
+            tableBody.innerHTML = ''; // Clear previous rows
+
+            if (!course.pars || !course.hcpIndices) return; // Wait for course data
+
+            const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
+            const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
 
             for (let i = 1; i <= 18; i++) {
-                const holeWrapper = document.createElement('div');
-                holeWrapper.className = 'p-2 rounded-lg bg-gray-50 flex flex-col items-center';
+                const holePar = course.pars[i - 1];
+                const holeHcpIndex = course.hcpIndices[i - 1];
+                const handicapStrokes = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
 
-                const label = document.createElement('label');
-                label.htmlFor = `player-score-hole-${i}`;
-                label.className = 'text-sm font-semibold text-gray-600 mb-1';
-                label.textContent = `Loch ${i}`;
+                const row = tableBody.insertRow();
+                row.className = 'text-center bg-white border-b hover:bg-gray-50';
 
+                // Loch #
+                const cellHole = row.insertCell();
+                cellHole.className = 'px-3 py-2 font-medium text-gray-900';
+                cellHole.textContent = i;
+
+                // Par
+                const cellPar = row.insertCell();
+                cellPar.className = 'px-3 py-2';
+                cellPar.textContent = holePar;
+
+                // Vorgabe
+                const cellVorgabe = row.insertCell();
+                cellVorgabe.className = 'px-3 py-2';
+                cellVorgabe.textContent = handicapStrokes;
+
+                // Score Input
+                const cellScore = row.insertCell();
+                cellScore.className = 'px-3 py-2';
                 const input = document.createElement('input');
                 input.type = 'number';
                 input.id = `player-score-hole-${i}`;
                 input.min = '0';
                 input.max = '15';
-                input.className = 'score-input w-full'; // w-full to fill the container
+                input.className = 'score-input'; // Use existing styling
                 const currentScore = scores[player.id] && scores[player.id][`hole${i}`] !== undefined ? scores[player.id][`hole${i}`] : '';
                 input.value = currentScore;
 
@@ -767,12 +802,10 @@
                         e.target.classList.add('bg-green-200');
                     }
                 });
-
-                holeWrapper.appendChild(label);
-                holeWrapper.appendChild(input);
-                gridContainer.appendChild(holeWrapper);
+                cellScore.appendChild(input);
             }
         }
+
 
         function calculateAndRenderLeaderboard() {
             const leaderboardData = [];
@@ -833,7 +866,7 @@
                 if (showPopup) showMessageBox("Fehler", "Bitte melden Sie sich zuerst an.");
                 return;
             }
-            const inputs = document.querySelectorAll('#playerScoresGrid .score-input');
+            const inputs = document.querySelectorAll('#playerScoresTableBody .score-input');
             const scoresToSave = {};
             let hasChanged = false;
 
@@ -985,7 +1018,7 @@
         liveScoreBtn.addEventListener('click', () => {
             // 1. Check for unsynced changes ONLY if a player is logged in
             if (activePlayerId) {
-                const inputs = document.querySelectorAll('#playerScoresGrid .score-input');
+                const inputs = document.querySelectorAll('#playerScoresTableBody .score-input');
                 const hasUnsyncedChanges = Array.from(inputs).some(input => input.classList.contains('bg-red-200'));
                 if (hasUnsyncedChanges) {
                     showMessageBox("Info", "Bitte synchronisieren Sie zuerst alle Änderungen, indem Sie auf 'Synchronisieren' klicken.");
@@ -1050,7 +1083,7 @@
                 showMessageBox("Fehler", "Bitte melden Sie sich zuerst an.");
                 return;
             }
-            const inputs = document.querySelectorAll('#playerScoresGrid .score-input');
+            const inputs = document.querySelectorAll('#playerScoresTableBody .score-input');
             const hasUnsyncedChanges = Array.from(inputs).some(input => input.classList.contains('bg-red-200'));
 
             if (hasUnsyncedChanges) {
