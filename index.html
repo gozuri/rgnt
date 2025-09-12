@@ -369,6 +369,27 @@
                 <button id="saveCourseBtn" class="btn btn-primary mt-4 w-full">Platz-Einstellungen speichern</button>
             </div>
 
+            <!-- NEU: Turniersteuerung -->
+            <div class="card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">Turniersteuerung</h2>
+                <div class="flex flex-col space-y-4">
+                    <div class="flex items-center justify-between">
+                        <label for="lockScoresToggle" class="text-gray-600">Score-Eingabe für Spieler sperren</label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="lockScoresToggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <label for="showLiveScoreToggle" class="text-gray-600">Live Score für Spieler anzeigen</label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="showLiveScoreToggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             <!-- Spieler hinzufügen -->
             <div class="card">
                 <h2 class="text-xl font-semibold mb-4 text-gray-700">2. Spieler hinzufügen</h2>
@@ -431,6 +452,12 @@
         <!-- Spieler-Modus Inhalte -->
         <div id="playerContent"> <!-- Initially visible -->
             <div class="card">
+                <!-- NEU: Statusmeldung für gesperrte Eingabe -->
+                <div id="scoreLockMessage" class="hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded-md" role="alert">
+                    <p class="font-bold">Hinweis</p>
+                    <p>Die Score-Eingabe ist momentan vom Turnier-Organisator gesperrt.</p>
+                </div>
+
                 <h2 class="text-xl font-semibold mb-4 text-gray-700" id="playerWelcomeMessage"></h2>
                 <div class="input-group">
                     <label for="playerSelect">Wähle Deinen Namen:</label>
@@ -525,6 +552,7 @@
         let course = {}; // Speichert die aktuellen Platzdaten (CR, SR, Pars etc.)
         let players = []; // Array aller Spieler
         let scores = {}; // Objekt, das die Scores aller Spieler speichert { playerId: { hole1: score, ... } }
+        let settings = { isScoreEntryLocked: false, isLiveScoreVisible: true }; // Speichert globale Turniereinstellungen
         let unsubscribePlayers; // Funktion zum Abbestellen des Player-Listeners
         let unsubscribeTournamentData; // Funktion zum Abbestellen des Tournament-Listeners
         let debounceTimer; // Timer für das automatische Speichern
@@ -588,6 +616,9 @@
         const titleEl = document.getElementById("title");
         const titleEl2 = document.getElementById("title2");
         const syncStatusEl = document.getElementById('syncStatus');
+        const lockScoresToggle = document.getElementById('lockScoresToggle');
+        const showLiveScoreToggle = document.getElementById('showLiveScoreToggle');
+        const scoreLockMessage = document.getElementById('scoreLockMessage');
 
         // ===================================================================================
         // UI & DISPLAY FUNCTIONS
@@ -753,6 +784,29 @@
                 syncScoresBtn.disabled = true;
                 if (showWelcomeMessage) {
                     showMessageBox("Fehler", "Spieler nicht gefunden. Bitte wählen Sie einen gültigen Spieler.");
+                }
+            }
+        }
+
+        /**
+         * Wendet die globalen Turniereinstellungen (z.B. Sperren) auf die UI an.
+         */
+        function applyTournamentSettings() {
+            // Setze die Schalter im Organisator-Modus auf den korrekten Zustand
+            lockScoresToggle.checked = settings.isScoreEntryLocked;
+            showLiveScoreToggle.checked = settings.isLiveScoreVisible;
+
+            // Zeige/verstecke den Live Score Button für Spieler
+            liveScoreBtn.classList.toggle('hidden', !settings.isLiveScoreVisible);
+
+            // Zeige/verstecke die Sperr-Nachricht für Spieler
+            scoreLockMessage.classList.toggle('hidden', !settings.isScoreEntryLocked);
+
+            // Rendere die Spieler-Eingabemaske neu, um den disabled-Status zu aktualisieren, falls ein Spieler angemeldet ist
+            if (currentMode === 'player' && activePlayerId) {
+                const player = players.find(p => p.id === activePlayerId);
+                if (player) {
+                    renderPlayerScoresInput(player);
                 }
             }
         }
@@ -937,6 +991,13 @@
                 stepperContainer.appendChild(plusBtn);
                 cellScore.appendChild(stepperContainer);
 
+                // Deaktiviere die Eingabeelemente, wenn die Eingabe gesperrt ist
+                if (settings.isScoreEntryLocked) {
+                    minusBtn.disabled = true;
+                    input.disabled = true;
+                    plusBtn.disabled = true;
+                }
+
                 // Event Listeners
                 if (currentScore !== '' && currentScore !== null && currentScore !== undefined) {
                     input.classList.add('bg-green-200');
@@ -978,9 +1039,16 @@
                 });
             }
             updatePlayerTotalScore();
-            syncStatusEl.textContent = 'Gespeichert';
-            syncStatusEl.classList.add('text-green-600');
-            syncStatusEl.classList.remove('text-red-600');
+            syncScoresBtn.disabled = settings.isScoreEntryLocked;
+            if (settings.isScoreEntryLocked) {
+                 syncStatusEl.textContent = 'Eingabe gesperrt';
+                 syncStatusEl.classList.remove('text-green-600');
+                 syncStatusEl.classList.add('text-yellow-600');
+            } else {
+                syncStatusEl.textContent = 'Gespeichert';
+                syncStatusEl.classList.add('text-green-600');
+                syncStatusEl.classList.remove('text-red-600');
+            }
         }
 
         /**
@@ -1090,6 +1158,14 @@
         async function updateCourseData() {
             if (!authReady) return;
             await setDoc(tournamentDocRef, { course: course }, { merge: true });
+        }
+
+        /**
+         * Speichert die globalen Turniereinstellungen in Firestore.
+         */
+        async function updateSettingsInDB() {
+            if (!authReady) return;
+            await setDoc(tournamentDocRef, { settings: settings }, { merge: true });
         }
 
         /**
@@ -1573,6 +1649,8 @@
                         unsubscribeTournamentData = onSnapshot(tournamentDocRef, (docSnap) => {
                             if (docSnap.exists()) {
                                 course = docSnap.data().course || course;
+                                settings = docSnap.data().settings || { isScoreEntryLocked: false, isLiveScoreVisible: true };
+
                                 tournamentNameInput.value = course.tournamentName || '';
                                 courseNameInput.value = course.courseName || '';
                                 courseRatingInput.value = course.courseRating;
@@ -1585,6 +1663,8 @@
                                     const input = document.getElementById(`hcpIndex${i + 1}`);
                                     if (input) input.value = hcpIndex;
                                 });
+
+                                applyTournamentSettings();
                                 renderPlayers();
                                 calculateAndRenderLeaderboard();
                             }
@@ -1655,6 +1735,18 @@
                     hcpInput.addEventListener('input', validateHcpInputs);
                 }
             }
+
+            // Listener für die Turniersteuerungs-Schalter
+            lockScoresToggle.addEventListener('change', () => {
+                settings.isScoreEntryLocked = lockScoresToggle.checked;
+                updateSettingsInDB();
+            });
+
+            showLiveScoreToggle.addEventListener('change', () => {
+                settings.isLiveScoreVisible = showLiveScoreToggle.checked;
+                updateSettingsInDB();
+            });
+
 
             // Listener, die auf Klicks warten
             document.addEventListener('click', () => {
