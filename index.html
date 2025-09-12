@@ -167,6 +167,10 @@
             max-height: 80vh; /* Added: Max height for scrollability */
             overflow-y: auto; /* Added: Enable vertical scrolling */
         }
+        /* KORREKTUR: Z-Index für Standard-Nachrichtenbox erhöhen, damit sie über anderen Modals erscheint */
+        #messageBox {
+            z-index: 1020;
+        }
         .message-box-overlay {
             position: fixed;
             top: 0;
@@ -191,6 +195,7 @@
             padding-top: 1.5rem; /* Add some space above the button */
             display: flex;
             justify-content: center;
+            gap: 1rem;
         }
 
         /* Styles for the custom password modal */
@@ -203,7 +208,7 @@
             padding: 2rem;
             border-radius: 1rem;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-            z-index: 1001; /* Higher than messageBox */
+            z-index: 1010;
             text-align: center;
             max-width: 90%;
             width: 400px;
@@ -308,13 +313,39 @@
 
         <!-- Custom Password Modal -->
         <div id="passwordModal" class="hidden">
-            <h3>Organisator-Passwort</h3>
+            <h3>Passwort</h3>
             <input type="password" id="passwordInput" placeholder="Passwort eingeben">
             <div class="button-group">
                 <button id="passwordSubmitBtn" class="btn btn-primary">Bestätigen</button>
                 <button id="passwordCancelBtn" class="btn btn-secondary">Abbrechen</button>
             </div>
         </div>
+
+        <!-- NEU: Turnierverwaltung Modal -->
+        <div id="tournamentAdminModal" class="hidden message-box">
+            <h3 class="font-bold">Turnierverwaltung</h3>
+            <div class="card">
+                <h4 class="text-lg font-semibold mb-2 text-gray-700">A. Neues Turnier erstellen</h4>
+                <div class="input-group">
+                    <label for="newTournamentNameInput">Name des neuen Turniers:</label>
+                    <input type="text" id="newTournamentNameInput" class="input-field" placeholder="z.B. Season Opener">
+                </div>
+                <button id="createTournamentBtn" class="btn btn-primary w-full">Erstellen</button>
+            </div>
+            <div class="card">
+                 <h4 class="text-lg font-semibold mb-2 text-gray-700">B. Gespeichertes Turnier laden/löschen</h4>
+                 <div class="input-group">
+                     <label for="loadTournamentSelect">Gespeichertes Turnier:</label>
+                     <select id="loadTournamentSelect" class="input-field"></select>
+                </div>
+                <div class="flex gap-4">
+                    <button id="loadTournamentBtn" class="btn btn-secondary w-2/3">Laden</button>
+                    <button id="deleteTournamentBtn" class="btn btn-danger w-1/3">Löschen</button>
+                </div>
+            </div>
+             <button id="closeAdminModalBtn" class="btn btn-secondary mt-4">Schliessen</button>
+        </div>
+
 
         <!-- Organisator-Modus Inhalte -->
         <div id="organizerContent" class="hidden"> <!-- Initially hidden -->
@@ -535,12 +566,12 @@
             </div>
             <div class="flex flex-col sm:flex-row gap-4 mt-4">
                 <button id="organizerSyncBtn" class="btn bg-green-700 hover:bg-green-800 text-white w-full sm:w-1/2 organizer-only">Synchronisieren</button>
-                <button id="resetAllBtn" class="btn btn-danger w-full sm:w-1/2 organizer-only">Alle Daten zurücksetzen</button>
             </div>
         </div>
 
         <!-- Organisator-Modus Knopf ganz unten -->
         <div class="bottom-button-container">
+            <button id="tournamentAdminBtn" class="btn btn-secondary">Turniere</button>
             <button id="organizerModeBtnBottom" class="btn btn-secondary">Organisator-Modus</button>
         </div>
     </div>
@@ -558,13 +589,14 @@
         // Globale Variablen für App-Zustand und Firebase-Instanzen
         let app, db, auth;
         let authReady = false;
-        let tournamentDocRef;
+        let tournamentsCollectionRef; // Referenz zur Sammlung aller Turniere
+        let tournamentDocRef; // Referenz zum aktuell geladenen Turnier-Dokument
+        let currentTournamentId = null; // ID des aktuellen Turniers
         let course = {}; // Speichert die aktuellen Platzdaten (CR, SR, Pars etc.)
         let players = []; // Array aller Spieler
         let scores = {}; // Objekt, das die Scores aller Spieler speichert { playerId: { hole1: score, ... } }
         let settings = { isScoreEntryLocked: false, isLiveScoreVisible: true }; // Speichert globale Turniereinstellungen
-        let unsubscribePlayers; // Funktion zum Abbestellen des Player-Listeners
-        let unsubscribeTournamentData; // Funktion zum Abbestellen des Tournament-Listeners
+        let unsubscribeTournament; // Funktion zum Abbestellen des Tournament-Listeners
         let debounceTimer; // Timer für das automatische Speichern
 
         // Globale UI-Zustandsvariablen
@@ -592,7 +624,6 @@
         const playerModeBtn = document.getElementById('playerModeBtn');
         const organizerContent = document.getElementById('organizerContent');
         const playerContent = document.getElementById('playerContent');
-        const resetAllBtn = document.getElementById('resetAllBtn');
         const leaderboardCard = document.getElementById('leaderboardCard');
         const saveCourseBtn = document.getElementById('saveCourseBtn');
         const courseDetailsTable = document.getElementById('courseDetailsTable');
@@ -611,7 +642,6 @@
         const messageBoxOverlay = document.getElementById('messageBoxOverlay');
         const messageBoxTitle = document.getElementById('messageBoxTitle');
         const messageBoxContent = document.getElementById('messageBoxContent');
-        const messageBoxCloseBtn = document.getElementById('messageBoxCloseBtn');
         const passwordModal = document.getElementById('passwordModal');
         const passwordInput = document.getElementById('passwordInput');
         const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
@@ -636,6 +666,16 @@
         const playerNameInfo = document.getElementById('playerNameInfo');
         const playerEhcInfo = document.getElementById('playerEhcInfo');
 
+        // Turnierverwaltung
+        const tournamentAdminBtn = document.getElementById('tournamentAdminBtn');
+        const tournamentAdminModal = document.getElementById('tournamentAdminModal');
+        const closeAdminModalBtn = document.getElementById('closeAdminModalBtn');
+        const newTournamentNameInput = document.getElementById('newTournamentNameInput');
+        const createTournamentBtn = document.getElementById('createTournamentBtn');
+        const loadTournamentSelect = document.getElementById('loadTournamentSelect');
+        const loadTournamentBtn = document.getElementById('loadTournamentBtn');
+        const deleteTournamentBtn = document.getElementById('deleteTournamentBtn');
+
         // ===================================================================================
         // UI & DISPLAY FUNCTIONS
         // ===================================================================================
@@ -644,8 +684,8 @@
          * Aktualisiert die Haupttitel der Seite.
          */
         function updatePageTitles() {
-            const name = tournamentNameInput.value.trim();
-            titleEl.textContent = name || "Turniername";
+            const name = course.tournamentName || "Kein Turnier geladen";
+            titleEl.textContent = name;
             titleEl2.textContent = "8105 Tour 2025";
         }
 
@@ -654,7 +694,7 @@
          */
         function updateInfoBox() {
             // Kurs-Info aktualisieren
-            if (course.courseName) {
+            if (course && course.courseName) {
                 courseNameInfo.textContent = course.courseName;
                 courseRatingsInfo.textContent = `CR: ${course.courseRating} / SR: ${course.slopeRating}`;
                 courseInfoBox.classList.remove('hidden');
@@ -665,7 +705,7 @@
             // Spieler-Info aktualisieren
             if (activePlayerId) {
                 const player = players.find(p => p.id === activePlayerId);
-                if (player && course.pars) {
+                if (player && course && course.pars) {
                      const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
                      const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
                      playerNameInfo.textContent = player.name;
@@ -677,24 +717,49 @@
             }
         }
 
-        /**
+       /**
          * Zeigt eine modale Nachrichtenbox an.
          * @param {string} title - Der Titel der Nachricht.
          * @param {string} content - Der Inhalt der Nachricht (kann HTML sein).
+         * @param {function} [confirmCallback] - Optionaler Callback, der ausgeführt wird, wenn der "OK"-Button geklickt wird.
          */
-        function showMessageBox(title, content) {
+        function showMessageBox(title, content, confirmCallback = null) {
             messageBoxTitle.textContent = title;
             messageBoxContent.innerHTML = content;
             messageBox.classList.remove('hidden');
             messageBoxOverlay.classList.remove('hidden');
+
+            // Setzt den Z-Index des Overlays höher, damit es über dem Admin-Modal liegt, falls offen
+            if (!tournamentAdminModal.classList.contains('hidden')) {
+                messageBoxOverlay.style.zIndex = '1001';
+            }
+
+            let okButton = document.getElementById('messageBoxCloseBtn');
+            const newOkButton = okButton.cloneNode(true);
+            okButton.parentNode.replaceChild(newOkButton, okButton);
+            okButton = newOkButton; // Update reference
+
+            const action = () => {
+                hideMessageBox();
+                if (confirmCallback) {
+                    confirmCallback();
+                }
+            };
+
+            okButton.addEventListener('click', action, { once: true });
         }
+
 
         /**
          * Versteckt die modale Nachrichtenbox.
          */
         function hideMessageBox() {
             messageBox.classList.add('hidden');
-            messageBoxOverlay.classList.add('hidden');
+            // Setzt den Z-Index des Overlays zurück, versteckt es aber nur, wenn kein anderes Modal offen ist
+            messageBoxOverlay.style.zIndex = '999';
+            if (passwordModal.classList.contains('hidden') && tournamentAdminModal.classList.contains('hidden')) {
+                messageBoxOverlay.classList.add('hidden');
+            }
         }
 
         /**
@@ -714,8 +779,24 @@
          */
         function hidePasswordModal() {
             passwordModal.classList.add('hidden');
-            messageBoxOverlay.classList.add('hidden');
+             if (tournamentAdminModal.classList.contains('hidden')) {
+                messageBoxOverlay.classList.add('hidden');
+            }
             passwordModal._submitCallback = null;
+        }
+
+        /**
+         * Zeigt/versteckt das Turnierverwaltungs-Modal.
+         */
+        function showTournamentAdminModal() {
+            tournamentAdminModal.classList.remove('hidden');
+            messageBoxOverlay.classList.remove('hidden');
+            loadTournamentList();
+        }
+
+        function hideTournamentAdminModal() {
+            tournamentAdminModal.classList.add('hidden');
+            messageBoxOverlay.classList.add('hidden');
         }
 
         /**
@@ -727,11 +808,14 @@
             localStorage.setItem('golfStablefordCurrentMode', currentMode);
 
             if (mode === 'organizer') {
+                if (!currentTournamentId) {
+                    showMessageBox("Hinweis", "Bitte zuerst ein Turnier in der Turnierverwaltung erstellen oder laden.");
+                    return;
+                }
                 if (sessionStorage.getItem('organizerSession') === 'active') {
                     organizerSessionActive = true;
                     organizerContent.classList.remove('hidden');
                     playerContent.classList.add('hidden');
-                    resetAllBtn.classList.remove('hidden');
                     leaderboardCard.classList.remove('hidden');
                     playerModeBtn.classList.add('btn-secondary');
                     playerModeBtn.classList.remove('btn-primary');
@@ -744,7 +828,6 @@
                             sessionStorage.setItem('organizerSession', 'active');
                             organizerContent.classList.remove('hidden');
                             playerContent.classList.add('hidden');
-                            resetAllBtn.classList.remove('hidden');
                             leaderboardCard.classList.remove('hidden');
                             playerModeBtn.classList.add('btn-secondary');
                             playerModeBtn.classList.remove('btn-primary');
@@ -752,7 +835,7 @@
                             organizerModeBtnBottom.classList.remove('btn-secondary');
                             showMessageBox("Erfolgreich", "Organisator-Modus aktiviert.");
                         } else {
-                            showMessageBox("Zugriff verweigert", "Falsches Passwort. Sie können den Organisator-Modus nicht betreten.");
+                            showMessageBox("Zugriff verweigert", "Falsches Passwort.");
                             switchMode('player'); // Revert to player mode
                         }
                     });
@@ -760,17 +843,18 @@
             } else {
                 organizerContent.classList.add('hidden');
                 playerContent.classList.remove('hidden');
-                resetAllBtn.classList.add('hidden');
                 leaderboardCard.classList.add('hidden');
                 playerModeBtn.classList.add('btn-primary');
                 playerModeBtn.classList.remove('btn-secondary');
                 organizerModeBtnBottom.classList.add('btn-secondary');
                 organizerModeBtnBottom.classList.remove('btn-primary');
-                populatePlayerSelect();
-                playerWelcomeMessage.textContent = "Bitte wählen Sie Deinen Namen und melden Sie sich an.";
-                document.getElementById('playerScoresTableBody').innerHTML = '';
-                playerSaveScoresBtn.disabled = true;
-                syncScoresBtn.disabled = true;
+                if (currentTournamentId) {
+                    populatePlayerSelect();
+                    playerWelcomeMessage.textContent = "Bitte wählen Sie Deinen Namen und melden Sie sich an.";
+                    document.getElementById('playerScoresTableBody').innerHTML = '';
+                    playerSaveScoresBtn.disabled = true;
+                    syncScoresBtn.disabled = true;
+                }
             }
             updateInfoBox();
         }
@@ -907,7 +991,7 @@
          */
         function renderPlayers() {
             playersTableBody.innerHTML = '';
-            if (!course.pars) return; // Warten, bis Platzdaten geladen sind
+            if (!course || !course.pars) return; // Warten, bis Platzdaten geladen sind
             const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
             players.forEach((player) => {
                 const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
@@ -970,7 +1054,7 @@
             const tableBody = document.getElementById('playerScoresTableBody');
             tableBody.innerHTML = '';
 
-            if (!course.pars || !course.hcpIndices) return;
+            if (!course || !course.pars || !course.hcpIndices) return;
 
             const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
             const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
@@ -1088,7 +1172,7 @@
          */
         function calculateAndRenderLeaderboard() {
             const leaderboardData = [];
-            if (!course.pars) return;
+            if (!course || !course.pars) return;
             const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
 
             players.forEach(player => {
@@ -1188,7 +1272,7 @@
          * Speichert die aktuellen Platzdaten in Firestore.
          */
         async function updateCourseData() {
-            if (!authReady) return;
+            if (!authReady || !tournamentDocRef) return;
             await setDoc(tournamentDocRef, { course: course }, { merge: true });
         }
 
@@ -1196,27 +1280,27 @@
          * Speichert die globalen Turniereinstellungen in Firestore.
          */
         async function updateSettingsInDB() {
-            if (!authReady) return;
+            if (!authReady || !tournamentDocRef) return;
             await setDoc(tournamentDocRef, { settings: settings }, { merge: true });
         }
 
         /**
-         * Fügt einen neuen Spieler zur Firestore-Datenbank hinzu.
+         * Fügt einen neuen Spieler zum aktiven Turnier hinzu.
          * @param {object} player - Das Spielerobjekt.
          */
         async function addPlayerToDB(player) {
-            if (!authReady) return;
+            if (!authReady || !tournamentDocRef) return;
             const playersCollectionRef = collection(tournamentDocRef, 'players');
             const newPlayerDocRef = doc(playersCollectionRef, player.id);
-            await setDoc(newPlayerDocRef, player, { merge: true });
+            await setDoc(newPlayerDocRef, player);
         }
 
         /**
-         * Entfernt einen Spieler aus der Firestore-Datenbank.
+         * Entfernt einen Spieler aus dem aktiven Turnier.
          * @param {string} playerId - Die ID des zu entfernenden Spielers.
          */
         async function removePlayerFromDB(playerId) {
-            if (!authReady) return;
+            if (!authReady || !tournamentDocRef) return;
             const playerDocRef = doc(collection(tournamentDocRef, 'players'), playerId);
             await deleteDoc(playerDocRef);
         }
@@ -1226,25 +1310,24 @@
          * @param {boolean} showPopup - Ob nach Erfolg eine Nachrichtenbox angezeigt werden soll.
          */
         async function syncScoresAndProvideFeedback(showPopup) {
-            if (!activePlayerId) return;
+            if (!activePlayerId || !tournamentDocRef) return;
 
             syncStatusEl.textContent = 'Speichern...';
             syncStatusEl.classList.remove('text-green-600', 'text-red-600');
 
-            const inputs = document.querySelectorAll('#playerScoresTableBody .score-input');
             const scoresToSave = {};
             let hasChanged = false;
 
+            const inputs = document.querySelectorAll('#playerScoresTableBody .score-input');
             for (let i = 0; i < inputs.length; i++) {
                 const input = inputs[i];
                 const score = input.value === '' ? null : parseInt(input.value);
                 const holeNumber = i + 1;
+                const currentDbScore = scores[activePlayerId] ? scores[activePlayerId][`hole${holeNumber}`] : undefined;
 
-                const dbScore = scores[activePlayerId] && scores[activePlayerId][`hole${holeNumber}`];
-
-                if (score !== dbScore) {
-                     scoresToSave[`hole${holeNumber}`] = score;
-                     hasChanged = true;
+                if (score !== currentDbScore) {
+                    scoresToSave[`hole${holeNumber}`] = score;
+                    hasChanged = true;
                 }
             }
 
@@ -1269,6 +1352,21 @@
                  syncStatusEl.textContent = 'Fehler beim Speichern';
                  syncStatusEl.classList.add('text-red-600');
             }
+        }
+
+        /**
+         * Lädt die Liste der gespeicherten Turniere und füllt das Dropdown.
+         */
+        async function loadTournamentList() {
+            if(!tournamentsCollectionRef) return;
+            const querySnapshot = await getDocs(tournamentsCollectionRef);
+            loadTournamentSelect.innerHTML = '';
+            querySnapshot.forEach(doc => {
+                 const option = document.createElement('option');
+                 option.value = doc.id;
+                 option.textContent = doc.data().course.tournamentName || doc.id;
+                 loadTournamentSelect.appendChild(option);
+            });
         }
 
         // ===================================================================================
@@ -1341,7 +1439,6 @@
             showMessageBox("Erfolgreich", "Spieler wurde entfernt.");
         }
 
-        messageBoxCloseBtn.addEventListener('click', hideMessageBox);
         messageBoxOverlay.addEventListener('click', hideMessageBox);
         organizerModeBtnBottom.addEventListener('click', () => switchMode('organizer'));
         playerModeBtn.addEventListener('click', () => switchMode('player'));
@@ -1360,33 +1457,20 @@
                 showMessageBox("Fehler", "Sie sind nicht als Organisator angemeldet.");
                 return;
             }
-            const inputs = scoresTableBody.querySelectorAll('.score-input');
-            const scoresToSave = {};
-            let hasChanged = false;
 
-            players.forEach(player => {
-                scoresToSave[player.id] = {};
-                for (let i = 1; i <= 18; i++) {
+            const batch = writeBatch(db);
+            players.forEach((player) => {
+                const playerDocRef = doc(collection(tournamentDocRef, 'players'), player.id);
+                const scoresToUpdate = {};
+                 for (let i = 1; i <= 18; i++) {
                     const input = document.querySelector(`#score-${player.id}-hole${i}`);
-                    const score = input.value === '' ? null : parseInt(input.value);
-                    const dbScore = scores[player.id] && scores[player.id][`hole${i}`];
-
-                    if (score !== dbScore) {
-                        hasChanged = true;
+                    if(input){
+                        scoresToUpdate[`hole${i}`] = input.value === '' ? null : parseInt(input.value);
                     }
-                    scoresToSave[player.id][`hole${i}`] = score;
                 }
+                batch.set(playerDocRef, { scores: scoresToUpdate }, { merge: true });
             });
-
-            if (hasChanged) {
-                const batch = writeBatch(db);
-                for (const playerId in scoresToSave) {
-                    const playerDocRef = doc(collection(tournamentDocRef, 'players'), playerId);
-                    batch.set(playerDocRef, { scores: scoresToSave[playerId] }, { merge: true });
-                }
-                await batch.commit();
-            }
-
+            await batch.commit();
             showMessageBox("Erfolg", "Rangliste aktualisiert.");
         });
 
@@ -1611,23 +1695,6 @@
             showMessageBox("Deine Scorecard", perHolePointsHtml);
         });
 
-
-        resetAllBtn.addEventListener('click', () => {
-            showMessageBox("Bestätigung", "Möchten Sie wirklich alle Turnierdaten zurücksetzen? Diese Aktion kann nicht rückgängig gemacht werden.");
-            messageBoxCloseBtn.onclick = () => {
-                hideMessageBox();
-                showPasswordModal((enteredPassword) => {
-                    if (enteredPassword === ORGANIZER_PASSWORD) {
-                        handleResetAllData();
-                        showMessageBox("Erfolgreich", "Alle Daten wurden zurückgesetzt.");
-                    } else {
-                        showMessageBox("Zugriff verweigert", "Falsches Passwort. Daten wurden nicht zurückgesetzt.");
-                    }
-                    messageBoxCloseBtn.onclick = hideMessageBox;
-                });
-            };
-        });
-
         organizerSyncBtn.addEventListener('click', () => {
             if (!organizerSessionActive) {
                 showMessageBox("Fehler", "Sie sind nicht als Organisator angemeldet.");
@@ -1636,21 +1703,6 @@
             calculateAndRenderLeaderboard();
         });
 
-        async function handleResetAllData() {
-            if (!authReady) return;
-            const batch = writeBatch(db);
-            const playersCollectionRef = collection(tournamentDocRef, 'players');
-            const playerDocs = await getDocs(playersCollectionRef);
-            playerDocs.forEach(d => {
-                batch.delete(d.ref);
-            });
-            course = { tournamentName: '', courseName: '', courseRating: 72.0, slopeRating: 120, pars: Array(18).fill(4), hcpIndices: Array.from({ length: 18 }, (_, i) => i + 1) };
-            batch.set(tournamentDocRef, { course: course });
-            await batch.commit();
-            localStorage.setItem('golfStablefordCurrentMode', 'organizer');
-            localStorage.removeItem('golfStablefordActivePlayerId');
-            switchMode('organizer');
-        }
 
         /**
          * Hauptinitialisierungsfunktion: Setzt Firebase auf, meldet den Benutzer anonym an und startet die Echtzeit-Listener.
@@ -1673,66 +1725,17 @@
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         authReady = true;
-                        const tournamentsCollection = collection(db, `/artifacts/${appId}/public/data/tournaments`);
-                        tournamentDocRef = doc(tournamentsCollection, 'current_tournament');
+                        tournamentsCollectionRef = collection(db, `/artifacts/${appId}/public/data/tournaments`);
 
-                        // Listener für Turnier-/Platzdaten
-                        if (unsubscribeTournamentData) unsubscribeTournamentData();
-                        unsubscribeTournamentData = onSnapshot(tournamentDocRef, (docSnap) => {
-                            if (docSnap.exists()) {
-                                course = docSnap.data().course || course;
-                                settings = docSnap.data().settings || { isScoreEntryLocked: false, isLiveScoreVisible: true };
+                        // Letztes geladenes Turnier aus dem Speicher holen
+                        currentTournamentId = localStorage.getItem('golfStablefordCurrentTournamentId') || 'live_tournament';
 
-                                tournamentNameInput.value = course.tournamentName || '';
-                                courseNameInput.value = course.courseName || '';
-                                courseRatingInput.value = course.courseRating;
-                                slopeRatingInput.value = course.slopeRating;
-                                course.pars.forEach((par, i) => {
-                                    const input = document.getElementById(`par${i + 1}`);
-                                    if (input) input.value = par;
-                                });
-                                course.hcpIndices.forEach((hcpIndex, i) => {
-                                    const input = document.getElementById(`hcpIndex${i + 1}`);
-                                    if (input) input.value = hcpIndex;
-                                });
-
-                                updatePageTitles();
-                                updateInfoBox();
-                                applyTournamentSettings();
-                                renderPlayers();
-                                calculateAndRenderLeaderboard();
-                            }
-                        }, (error) => console.error("Error listening to tournament data:", error));
-
-                        // Listener für Spieler- & Score-Daten
-                        if (unsubscribePlayers) unsubscribePlayers();
-                        const playersCollectionRef = collection(tournamentDocRef, 'players');
-                        unsubscribePlayers = onSnapshot(playersCollectionRef, (snapshot) => {
-                            const loadedPlayers = [];
-                            const loadedScores = {};
-                            snapshot.forEach(d => {
-                                const playerData = d.data();
-                                loadedPlayers.push({ id: d.id, ...playerData });
-                                loadedScores[d.id] = playerData.scores || {};
-                            });
-                            players = loadedPlayers;
-                            scores = loadedScores;
-
-                            renderPlayers();
-                            renderScoresInput();
-                            calculateAndRenderLeaderboard();
-                            populatePlayerSelect();
-                            updateInfoBox();
-
-                            const savedMode = localStorage.getItem('golfStablefordCurrentMode') || 'player';
-                            const savedPlayerId = localStorage.getItem('golfStablefordActivePlayerId');
-
-                            if (currentMode === 'player' && savedPlayerId) {
-                                loginPlayer(savedPlayerId, false);
-                            } else {
-                                switchMode(savedMode);
-                            }
-                        }, (error) => console.error("Error listening to players:", error));
+                        if (currentTournamentId) {
+                            setupListeners(currentTournamentId);
+                        } else {
+                             playerWelcomeMessage.textContent = "Willkommen! Bitte lade ein Turnier oder bitte den Organisator, eines zu erstellen.";
+                        }
+                        loadTournamentList();
 
                     } else {
                         console.log("User is signed out.");
@@ -1745,6 +1748,87 @@
             }
         }
 
+        /**
+         * Baut die Echtzeit-Listener für ein bestimmtes Turnier auf.
+         * @param {string} tournamentId Die ID des Turniers, auf das gehört werden soll.
+         */
+        function setupListeners(tournamentId) {
+             // Alten Listener abbestellen, falls vorhanden
+            if (unsubscribeTournament) {
+                unsubscribeTournament();
+            }
+
+            tournamentDocRef = doc(tournamentsCollectionRef, tournamentId);
+
+            unsubscribeTournament = onSnapshot(tournamentDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    course = data.course || {};
+                    settings = data.settings || { isScoreEntryLocked: false, isLiveScoreVisible: true };
+
+                    // Spieler sind jetzt eine Sub-Collection, wir müssen sie separat laden.
+                    const playersCollectionRef = collection(tournamentDocRef, 'players');
+                    onSnapshot(playersCollectionRef, (playersSnapshot) => {
+                        players = [];
+                        scores = {};
+                        playersSnapshot.forEach(playerDoc => {
+                            // Überspringe das Dummy-Dokument, falls es existiert
+                            if (playerDoc.id !== 'dummy') {
+                                const playerData = playerDoc.data();
+                                players.push({ id: playerDoc.id, ...playerData });
+                                scores[playerDoc.id] = playerData.scores || {};
+                            }
+                        });
+
+                        // UI aktualisieren, nachdem die Spieler geladen sind
+                        updateUIWithNewData();
+                    });
+
+                    tournamentNameInput.value = course.tournamentName || '';
+                    courseNameInput.value = course.courseName || '';
+                    courseRatingInput.value = course.courseRating;
+                    slopeRatingInput.value = course.slopeRating;
+                    if(course.pars && course.hcpIndices) {
+                        course.pars.forEach((par, i) => {
+                            const input = document.getElementById(`par${i + 1}`);
+                            if (input) input.value = par;
+                        });
+                        course.hcpIndices.forEach((hcpIndex, i) => {
+                            const input = document.getElementById(`hcpIndex${i + 1}`);
+                            if (input) input.value = hcpIndex;
+                        });
+                    }
+
+                    updatePageTitles();
+                    updateInfoBox();
+                    applyTournamentSettings();
+
+                } else {
+                    console.warn(`Tournament with ID "${tournamentId}" does not exist.`);
+                    currentTournamentId = null;
+                    localStorage.removeItem('golfStablefordCurrentTournamentId');
+                    showMessageBox("Fehler", "Das geladene Turnier existiert nicht mehr. Bitte wählen Sie ein anderes.", () => location.reload());
+                }
+            }, (error) => console.error("Error listening to tournament data:", error));
+        }
+
+        function updateUIWithNewData() {
+            renderPlayers();
+            renderScoresInput();
+            calculateAndRenderLeaderboard();
+            populatePlayerSelect();
+            updateInfoBox();
+
+            const savedPlayerId = localStorage.getItem('golfStablefordActivePlayerId');
+            if (currentMode === 'player' && savedPlayerId && players.some(p => p.id === savedPlayerId)) {
+                loginPlayer(savedPlayerId, false);
+            } else if (currentMode === 'player') {
+                activePlayerId = null;
+                updateInfoBox();
+            }
+        }
+
+
         // Initialisiert die App, wenn das DOM vollständig geladen ist.
         document.addEventListener('DOMContentLoaded', () => {
             initFirebase();
@@ -1752,9 +1836,9 @@
             // Globale Event Listener
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter') {
-                    if (!messageBox.classList.contains('hidden')) {
+                    if (!document.getElementById('messageBox').classList.contains('hidden')) {
                         event.preventDefault();
-                        messageBoxCloseBtn.click();
+                        document.getElementById('messageBoxCloseBtn').click();
                     }
                     else if (!passwordModal.classList.contains('hidden')) {
                         event.preventDefault();
@@ -1782,9 +1866,87 @@
                 updateSettingsInDB();
             });
 
-
             // Listener für die live Titelaktualisierung
             tournamentNameInput.addEventListener('input', updatePageTitles);
+
+            // Listener für Turnierverwaltung
+             tournamentAdminBtn.addEventListener('click', () => {
+                showPasswordModal((password) => {
+                    if (password === ORGANIZER_PASSWORD) {
+                        showTournamentAdminModal();
+                    } else {
+                        showMessageBox("Fehler", "Falsches Passwort.");
+                    }
+                });
+            });
+
+            closeAdminModalBtn.addEventListener('click', hideTournamentAdminModal);
+
+            createTournamentBtn.addEventListener('click', async () => {
+                const name = newTournamentNameInput.value.trim();
+                if (!name) {
+                    showMessageBox("Fehler", "Bitte geben Sie einen Namen für das neue Turnier ein.");
+                    return;
+                }
+                const newTournamentId = name.replace(/\s+/g, '-').toLowerCase() + '-' + Date.now();
+                const defaultCourse = { tournamentName: name, courseName: '', courseRating: 72.0, slopeRating: 120, pars: Array(18).fill(4), hcpIndices: Array.from({ length: 18 }, (_, i) => i + 1) };
+                const defaultSettings = { isScoreEntryLocked: false, isLiveScoreVisible: true };
+
+                await setDoc(doc(tournamentsCollectionRef, newTournamentId), {
+                    course: defaultCourse,
+                    settings: defaultSettings,
+                });
+                // Erstelle eine leere "players" Sub-Collection
+                const playersCollectionRef = collection(db, `/artifacts/${appId}/public/data/tournaments/${newTournamentId}/players`);
+                await setDoc(doc(playersCollectionRef, 'dummy'), { exists: true }); // Dummy-Dokument, um die Collection zu erstellen
+
+                currentTournamentId = newTournamentId;
+                localStorage.setItem('golfStablefordCurrentTournamentId', currentTournamentId);
+                setupListeners(currentTournamentId);
+                hideTournamentAdminModal();
+                showMessageBox("Erfolg", `Turnier "${name}" wurde erstellt und geladen.`);
+                loadTournamentList();
+            });
+
+            loadTournamentBtn.addEventListener('click', () => {
+                const selectedTournamentId = loadTournamentSelect.value;
+                if (!selectedTournamentId) {
+                    showMessageBox("Fehler", "Bitte wählen Sie ein Turnier zum Laden aus.");
+                    return;
+                }
+                currentTournamentId = selectedTournamentId;
+                localStorage.setItem('golfStablefordCurrentTournamentId', currentTournamentId);
+                setupListeners(currentTournamentId);
+                hideTournamentAdminModal();
+                showMessageBox("Erfolg", `Turnier "${loadTournamentSelect.options[loadTournamentSelect.selectedIndex].text}" wurde geladen.`);
+            });
+
+            deleteTournamentBtn.addEventListener('click', async () => {
+                const selectedTournamentId = loadTournamentSelect.value;
+                 if (!selectedTournamentId) {
+                    showMessageBox("Fehler", "Bitte wählen Sie ein Turnier zum Löschen aus.");
+                    return;
+                }
+                showMessageBox("Bestätigung", `Möchten Sie das Turnier "${loadTournamentSelect.options[loadTournamentSelect.selectedIndex].text}" wirklich unwiderruflich löschen?`, async () => {
+                    // Sub-Collection löschen
+                     const playersCollectionRef = collection(db, `/artifacts/${appId}/public/data/tournaments/${selectedTournamentId}/players`);
+                     const playerDocs = await getDocs(playersCollectionRef);
+                     const batch = writeBatch(db);
+                     playerDocs.forEach(d => batch.delete(d.ref));
+                     await batch.commit();
+
+                    // Hauptdokument löschen
+                    await deleteDoc(doc(tournamentsCollectionRef, selectedTournamentId));
+                    showMessageBox("Erfolg", "Turnier wurde gelöscht.");
+                    loadTournamentList();
+                     if (currentTournamentId === selectedTournamentId) {
+                        currentTournamentId = null;
+                        localStorage.removeItem('golfStablefordCurrentTournamentId');
+                        // Lade einen leeren Zustand, anstatt automatisch ein anderes zu laden
+                        location.reload();
+                    }
+                });
+            });
 
         });
     </script>
