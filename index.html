@@ -393,26 +393,8 @@
                 <button id="playerLoginBtn" class="btn btn-primary w-full mt-4">Anmelden</button>
 
                 <h3 class="text-lg font-semibold mt-6 mb-3 text-gray-700">Deine Ergebnisse eingeben</h3>
-                <div class="table-container">
-                    <table id="playerScoresTable">
-                        <thead>
-                            <tr>
-                                <th>Loch</th>
-                                <!-- Generate headers for holes 1-18 -->
-                                <script>
-                                    for (let i = 1; i <= 18; i++) {
-                                        document.write(`<th>${i}</th>`);
-                                    }
-                                </script>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr id="activePlayerScoreRow">
-                                <td>Schläge</td>
-                                <!-- Score inputs for active player will be inserted here -->
-                            </tr>
-                        </tbody>
-                    </table>
+                <div id="playerScoresGrid" class="grid grid-cols-3 sm:grid-cols-6 gap-4">
+                     <!-- Score inputs will be dynamically inserted here -->
                 </div>
                 <div class="flex flex-col sm:flex-row gap-4 mt-4">
                     <button id="syncScoresBtn" class="btn btn-primary w-full sm:w-1/2">Synchronisieren</button>
@@ -441,7 +423,10 @@
                     </tbody>
                 </table>
             </div>
-            <button id="resetAllBtn" class="btn btn-danger w-full mt-4 organizer-only">Alle Daten zurücksetzen</button>
+            <div class="flex flex-col sm:flex-row gap-4 mt-4">
+                <button id="organizerSyncBtn" class="btn bg-green-700 hover:bg-green-800 text-white w-full sm:w-1/2 organizer-only">Synchronisieren</button>
+                <button id="resetAllBtn" class="btn btn-danger w-full sm:w-1/2 organizer-only">Alle Daten zurücksetzen</button>
+            </div>
         </div>
 
         <!-- Organisator-Modus Knopf ganz unten -->
@@ -499,7 +484,6 @@
         const playerWelcomeMessage = document.getElementById('playerWelcomeMessage');
         const playerSelect = document.getElementById('playerSelect');
         const playerLoginBtn = document.getElementById('playerLoginBtn');
-        const activePlayerScoreRow = document.getElementById('activePlayerScoreRow');
         const playerSaveScoresBtn = document.getElementById('playerSaveScoresBtn');
         const leaderboardTableBody = document.querySelector('#leaderboardTable tbody');
         const messageBox = document.getElementById('messageBox');
@@ -516,6 +500,7 @@
         spinner.innerHTML = '<div class="w-16 h-16 border-4 border-blue-400 border-dashed rounded-full animate-spin"></div>';
         const syncScoresBtn = document.getElementById('syncScoresBtn');
         const liveScoreBtn = document.getElementById('liveScoreBtn');
+        const organizerSyncBtn = document.getElementById('organizerSyncBtn');
 
 
         const courseNameInput = document.getElementById('courseName');
@@ -629,7 +614,7 @@
                 organizerModeBtnBottom.classList.remove('btn-primary');
                 populatePlayerSelect();
                 playerWelcomeMessage.textContent = "Bitte wählen Sie Deinen Namen und melden Sie sich an.";
-                activePlayerScoreRow.innerHTML = '<td>Schläge</td>';
+                document.getElementById('playerScoresGrid').innerHTML = '';
                 playerSaveScoresBtn.disabled = true;
                 syncScoresBtn.disabled = true;
             }
@@ -662,7 +647,7 @@
                 activePlayerId = null;
                 localStorage.removeItem('golfStablefordActivePlayerId');
                 playerWelcomeMessage.textContent = "Bitte wählen Sie Deinen Namen und melden Sie sich an.";
-                activePlayerScoreRow.innerHTML = '<td>Schläge</td>';
+                document.getElementById('playerScoresGrid').innerHTML = '';
                 playerSaveScoresBtn.disabled = true;
                 syncScoresBtn.disabled = true;
                 if (showWelcomeMessage) {
@@ -745,21 +730,29 @@
         }
 
         function renderPlayerScoresInput(player) {
-            activePlayerScoreRow.innerHTML = '<td>Schläge</td>';
+            const gridContainer = document.getElementById('playerScoresGrid');
+            gridContainer.innerHTML = ''; // Clear previous inputs
+
             for (let i = 1; i <= 18; i++) {
-                const cell = document.createElement('td');
+                const holeWrapper = document.createElement('div');
+                holeWrapper.className = 'p-2 rounded-lg bg-gray-50 flex flex-col items-center';
+
+                const label = document.createElement('label');
+                label.htmlFor = `player-score-hole-${i}`;
+                label.className = 'text-sm font-semibold text-gray-600 mb-1';
+                label.textContent = `Loch ${i}`;
+
                 const input = document.createElement('input');
                 input.type = 'number';
-                input.min = '0'; // Allow 0
+                input.id = `player-score-hole-${i}`;
+                input.min = '0';
                 input.max = '15';
-                input.className = 'score-input';
+                input.className = 'score-input w-full'; // w-full to fill the container
                 const currentScore = scores[player.id] && scores[player.id][`hole${i}`] !== undefined ? scores[player.id][`hole${i}`] : '';
                 input.value = currentScore;
 
                 if (currentScore !== '' && currentScore !== null && currentScore !== undefined) {
                     input.classList.add('bg-green-200');
-                } else {
-                    input.classList.remove('bg-green-200');
                 }
 
                 input.addEventListener('input', (e) => {
@@ -775,8 +768,9 @@
                     }
                 });
 
-                cell.appendChild(input);
-                activePlayerScoreRow.appendChild(cell);
+                holeWrapper.appendChild(label);
+                holeWrapper.appendChild(input);
+                gridContainer.appendChild(holeWrapper);
             }
         }
 
@@ -791,7 +785,7 @@
                     const holePar = course.pars[i - 1];
                     const holeHcpIndex = course.hcpIndices[i - 1];
                     const grossScore = parseInt(playerScores[`hole${i}`]);
-                    if (!isNaN(grossScore) && grossScore >= 0) {
+                    if (!isNaN(grossScore) && grossScore > 0) {
                         totalStablefordPoints += calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
                     }
                 }
@@ -839,7 +833,7 @@
                 if (showPopup) showMessageBox("Fehler", "Bitte melden Sie sich zuerst an.");
                 return;
             }
-            const inputs = activePlayerScoreRow.querySelectorAll('.score-input');
+            const inputs = document.querySelectorAll('#playerScoresGrid .score-input');
             const scoresToSave = {};
             let hasChanged = false;
 
@@ -989,6 +983,17 @@
         });
 
         liveScoreBtn.addEventListener('click', () => {
+            // 1. Check for unsynced changes ONLY if a player is logged in
+            if (activePlayerId) {
+                const inputs = document.querySelectorAll('#playerScoresGrid .score-input');
+                const hasUnsyncedChanges = Array.from(inputs).some(input => input.classList.contains('bg-red-200'));
+                if (hasUnsyncedChanges) {
+                    showMessageBox("Info", "Bitte synchronisieren Sie zuerst alle Änderungen, indem Sie auf 'Synchronisieren' klicken.");
+                    return;
+                }
+            }
+
+            // 2. The rest of the function proceeds, as it works without a selected player
             const leaderboardData = [];
             const totalPar = course.pars ? course.pars.reduce((sum, p) => sum + p, 0) : 0;
             players.forEach(player => {
@@ -999,7 +1004,7 @@
                     const holePar = course.pars[i - 1];
                     const holeHcpIndex = course.hcpIndices[i - 1];
                     const grossScore = parseInt(playerScores[`hole${i}`]);
-                    if (!isNaN(grossScore) && grossScore >= 0) {
+                    if (!isNaN(grossScore) && grossScore > 0) {
                         totalStablefordPoints += calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
                     }
                 }
@@ -1045,7 +1050,7 @@
                 showMessageBox("Fehler", "Bitte melden Sie sich zuerst an.");
                 return;
             }
-            const inputs = activePlayerScoreRow.querySelectorAll('.score-input');
+            const inputs = document.querySelectorAll('#playerScoresGrid .score-input');
             const hasUnsyncedChanges = Array.from(inputs).some(input => input.classList.contains('bg-red-200'));
 
             if (hasUnsyncedChanges) {
@@ -1079,10 +1084,11 @@
             for (let i = 1; i <= 18; i++) {
                 const holePar = course.pars[i - 1];
                 const holeHcpIndex = course.hcpIndices[i - 1];
-                const grossScore = scoresToSave[`hole${i}`] ? parseInt(scoresToSave[`hole${i}`]) : NaN;
-                if (!isNaN(grossScore) && grossScore >= 0) {
-                    const holePar = course.pars[i - 1];
-                    const holeHcpIndex = course.hcpIndices[i - 1];
+                const scoreValue = scoresToSave[`hole${i}`];
+                // Korrigierte Logik: Behandelt 0 als ungültige Eingabe für die Berechnung
+                const grossScore = (scoreValue !== null && scoreValue !== undefined) ? parseInt(scoreValue) : NaN;
+
+                if (!isNaN(grossScore) && grossScore > 0) {
                     totalPoints += calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
                 }
                 const handicapStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
@@ -1091,8 +1097,8 @@
                         <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">${i}</td>
                         <td class="px-3 py-2 text-center">${holePar}</td>
                         <td class="px-3 py-2 text-center">${handicapStrokesForHole}</td>
-                        <td class="px-3 py-2 text-center">${isNaN(grossScore) ? '-' : grossScore}</td>
-                        <td class="px-3 py-2 text-center">${calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex)}</td>
+                        <td class="px-3 py-2 text-center">${(!isNaN(grossScore) && grossScore > 0) ? grossScore : '-'}</td>
+                        <td class="px-3 py-2 text-center">${calculateStablefordPoints((!isNaN(grossScore) && grossScore > 0) ? grossScore : NaN, holePar, playingHandicap, holeHcpIndex)}</td>
                     </tr>
                 `;
             }
@@ -1120,6 +1126,14 @@
                     messageBoxCloseBtn.onclick = hideMessageBox;
                 });
             };
+        });
+
+        organizerSyncBtn.addEventListener('click', () => {
+            if (!organizerSessionActive) {
+                showMessageBox("Fehler", "Sie sind nicht als Organisator angemeldet.");
+                return;
+            }
+            calculateAndRenderLeaderboard();
         });
 
         async function handleResetAllData() {
@@ -1187,6 +1201,9 @@
                                     const input = document.getElementById(`hcpIndex${i + 1}`);
                                     if (input) input.value = hcpIndex;
                                 });
+                                // NEU: Unmittelbare Neuberechnung bei Änderung der Platzdaten
+                                renderPlayers();
+                                calculateAndRenderLeaderboard();
                             }
                         }, (error) => {
                             console.error("Error listening to tournament data:", error);
@@ -1239,6 +1256,22 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             initFirebase();
+
+            // Event listener for Enter key on popups
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    // Check if the message box is visible
+                    if (!messageBox.classList.contains('hidden')) {
+                        event.preventDefault(); // Prevent any default form submission
+                        messageBoxCloseBtn.click(); // Simulate a click on the OK button
+                    }
+                    // Check if the password modal is visible
+                    else if (!passwordModal.classList.contains('hidden')) {
+                        event.preventDefault(); // Prevent any default form submission
+                        passwordSubmitBtn.click(); // Simulate a click on the Submit button
+                    }
+                }
+            });
 
             passwordSubmitBtn.addEventListener('click', () => {
                 const enteredPassword = passwordInput.value;
