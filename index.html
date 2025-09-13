@@ -504,7 +504,7 @@
                         </tbody>
                         <tfoot class="font-bold bg-gray-100">
                              <tr>
-                                <td colspan="3" class="px-3 py-2 text-right">STROKES:</td>
+                                <td colspan="3" class="px-3 py-2 text-right">TOTAL:</td>
                                 <td id="playerTotalScore" class="px-3 py-2 text-center">0</td>
                              </tr>
                         </tfoot>
@@ -551,9 +551,9 @@
 
         <!-- Organisator-Modus Knopf ganz unten -->
         <div class="bottom-button-container">
-            <button id="playerModeBtnBottom" class="btn btn-secondary">Spieler-Modus</button>
+            <button id="playerModeBtnBottom" class="btn btn-secondary">Spielen</button>
             <button id="tournamentAdminBtn" class="btn btn-secondary">Turniere</button>
-            <button id="organizerModeBtnBottom" class="btn btn-secondary">Organisator-Modus</button>
+            <button id="organizerModeBtnBottom" class="btn btn-secondary">Organisation</button>
         </div>
     </div>
 
@@ -722,7 +722,7 @@
             let okButton = document.getElementById('messageBoxCloseBtn');
             const newOkButton = okButton.cloneNode(true);
             okButton.parentNode.replaceChild(newOkButton, okButton);
-            //okButton = newOkButton; // Update reference
+            okButton = newOkButton; // Update reference
 
             const action = () => {
                 hideMessageBox();
@@ -731,7 +731,7 @@
                 }
             };
 
-            newOkButton.addEventListener('click', action, { once: true });
+            okButton.addEventListener('click', action, { once: true });
         }
 
 
@@ -1169,6 +1169,8 @@
             players.forEach(player => {
                 let totalStablefordPoints = 0;
                 let totalStrokes = 0;
+                let playedHoles = 0;
+                let playedPar = 0;
                 let playerScores = scores[player.id] || {};
                 const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
 
@@ -1177,11 +1179,14 @@
                     if (!isNaN(grossScore) && grossScore > 0) {
                         totalStablefordPoints += calculateStablefordPoints(grossScore, course.pars[i - 1], playingHandicap, course.hcpIndices[i - 1]);
                         totalStrokes += grossScore;
+                        playedHoles++;
+                        playedPar += course.pars[i - 1];
                     }
                 }
 
-                const brutto = totalStrokes > 0 ? totalStrokes - totalPar : null;
-                const netto = totalStrokes > 0 ? brutto - playingHandicap : null;
+                const proportionalHandicap = Math.round(playingHandicap * (playedHoles / 18));
+                const brutto = totalStrokes > 0 ? totalStrokes - playedPar : null;
+                const netto = totalStrokes > 0 ? brutto - proportionalHandicap : null;
 
                 leaderboardData.push({
                     name: player.name,
