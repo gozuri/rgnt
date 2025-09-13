@@ -722,7 +722,7 @@
             let okButton = document.getElementById('messageBoxCloseBtn');
             const newOkButton = okButton.cloneNode(true);
             okButton.parentNode.replaceChild(newOkButton, okButton);
-            okButton = newOkButton; // Update reference
+            //okButton = newOkButton; // Update reference
 
             const action = () => {
                 hideMessageBox();
@@ -731,7 +731,7 @@
                 }
             };
 
-            okButton.addEventListener('click', action, { once: true });
+            newOkButton.addEventListener('click', action, { once: true });
         }
 
 
@@ -1963,6 +1963,10 @@
                     showMessageBox("Fehler", "Bitte wählen Sie ein Turnier zum Löschen aus.");
                     return;
                 }
+                if (selectedTournamentId === 'live_tournament') {
+                    showMessageBox("Fehler", "Das Live-Turnier kann nicht direkt gelöscht werden. Laden Sie zuerst ein anderes Turnier.");
+                    return;
+                }
                 showMessageBox("Bestätigung", `Möchten Sie das Turnier "${loadTournamentSelect.options[loadTournamentSelect.selectedIndex].text}" wirklich unwiderruflich löschen?`, async () => {
                     // Sub-Collection löschen
                      const playersCollectionRef = collection(db, `/artifacts/${appId}/public/data/tournaments/${selectedTournamentId}/players`);
@@ -1975,12 +1979,6 @@
                     await deleteDoc(doc(tournamentsCollectionRef, selectedTournamentId));
                     showMessageBox("Erfolg", "Turnier wurde gelöscht.");
                     loadTournamentList();
-
-                    if(currentTournamentId === selectedTournamentId) {
-                        currentTournamentId = null;
-                        localStorage.removeItem('golfStablefordCurrentTournamentId');
-                        location.reload();
-                    }
                 });
             });
 
