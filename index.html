@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>8105 Tour 2025</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -305,25 +305,26 @@
         <div id="tournamentAdminModal" class="hidden message-box">
             <h3 class="font-bold">Turnierverwaltung</h3>
             <div class="card">
-                <h4 class="text-lg font-semibold mb-2 text-gray-700">A. Neues Turnier erstellen</h4>
+                <h4 class="text-lg font-semibold mb-2 text-gray-700">Neues Turnier erstellen</h4>
                 <div class="input-group">
-                    <label for="newTournamentNameInput">Name des neuen Turniers:</label>
-                    <input type="text" id="newTournamentNameInput" class="input-field" placeholder="z.B. Season Opener">
+                    <input type="text" id="newTournamentNameInput" class="input-field" placeholder="Name des neuen Turniers...">
                 </div>
                 <button id="createTournamentBtn" class="btn btn-primary w-full">Erstellen & als Live-Turnier setzen</button>
             </div>
             <div class="card">
-                 <h4 class="text-lg font-semibold mb-2 text-gray-700">B. Gespeichertes Turnier laden/löschen</h4>
+                 <h4 class="text-lg font-semibold mb-2 text-gray-700">Gespeichertes Turnier laden/löschen</h4>
                  <div class="input-group">
-                     <label for="loadTournamentSelect">Gespeichertes Turnier:</label>
                      <select id="loadTournamentSelect" class="input-field"></select>
                 </div>
                 <div class="flex gap-4">
-                    <button id="loadTournamentBtn" class="btn btn-secondary w-2/3">Als Live-Turnier laden</button>
+                    <button id="loadTournamentBtn" class="btn btn-secondary w-2/3">Laden</button>
                     <button id="deleteTournamentBtn" class="btn btn-danger w-1/3">Löschen</button>
                 </div>
             </div>
-             <button id="closeAdminModalBtn" class="btn btn-secondary mt-4">Schliessen</button>
+             <div class="flex gap-4 mt-4">
+                <button id="unloadTournamentBtn" class="btn btn-danger w-1/2">Live beenden</button>
+                <button id="closeAdminModalBtn" class="btn btn-secondary w-1/2">Schliessen</button>
+            </div>
         </div>
 
 
@@ -486,7 +487,10 @@
                         <option value="">-- Spieler auswählen --</option>
                     </select>
                 </div>
-                <button id="playerLoginBtn" class="btn btn-primary w-full mt-4">Anmelden</button>
+                <div class="flex flex-col sm:flex-row gap-4 mt-4">
+                    <button id="playerLoginBtn" class="btn btn-primary w-full sm:w-1/2">Anmelden</button>
+                    <button id="liveScoreBtn" class="btn bg-green-700 hover:bg-green-800 text-white w-full sm:w-1/2">Live Score</button>
+                </div>
 
                 <h3 class="text-lg font-semibold mt-6 mb-3 text-gray-700">Deine Ergebnisse eingeben</h3>
                 <div class="table-container">
@@ -518,7 +522,6 @@
                  <div class="text-center mt-2">
                     <span id="syncStatus" class="text-sm text-gray-500 sync-status"></span>
                  </div>
-                <button id="liveScoreBtn" class="btn bg-green-700 hover:bg-green-800 text-white w-full mt-4">Live Score</button>
             </div>
         </div> <!-- End of playerContent -->
 
@@ -551,7 +554,6 @@
 
         <!-- Organisator-Modus Knopf ganz unten -->
         <div class="bottom-button-container">
-            <button id="playerModeBtnBottom" class="btn btn-secondary">Spielen</button>
             <button id="tournamentAdminBtn" class="btn btn-secondary">Turniere</button>
             <button id="organizerModeBtnBottom" class="btn btn-secondary">Organisation</button>
         </div>
@@ -660,6 +662,7 @@
         const loadTournamentSelect = document.getElementById('loadTournamentSelect');
         const loadTournamentBtn = document.getElementById('loadTournamentBtn');
         const deleteTournamentBtn = document.getElementById('deleteTournamentBtn');
+        const unloadTournamentBtn = document.getElementById('unloadTournamentBtn');
 
         // ===================================================================================
         // UI & DISPLAY FUNCTIONS
@@ -804,8 +807,10 @@
                     leaderboardCard.classList.remove('hidden');
                     playerModeBtn.classList.add('btn-secondary');
                     playerModeBtn.classList.remove('btn-primary');
-                    playerModeBtnBottom.classList.add('btn-secondary');
-                    playerModeBtnBottom.classList.remove('btn-primary');
+                    if (playerModeBtnBottom) {
+                        playerModeBtnBottom.classList.add('btn-secondary');
+                        playerModeBtnBottom.classList.remove('btn-primary');
+                    }
                     organizerModeBtnBottom.classList.add('btn-primary');
                     organizerModeBtnBottom.classList.remove('btn-secondary');
                 } else {
@@ -818,8 +823,10 @@
                             leaderboardCard.classList.remove('hidden');
                             playerModeBtn.classList.add('btn-secondary');
                             playerModeBtn.classList.remove('btn-primary');
-                            playerModeBtnBottom.classList.add('btn-secondary');
-                            playerModeBtnBottom.classList.remove('btn-primary');
+                            if (playerModeBtnBottom) {
+                                playerModeBtnBottom.classList.add('btn-secondary');
+                                playerModeBtnBottom.classList.remove('btn-primary');
+                            }
                             organizerModeBtnBottom.classList.add('btn-primary');
                             organizerModeBtnBottom.classList.remove('btn-secondary');
                             showMessageBox("Erfolgreich", "Organisator-Modus aktiviert.");
@@ -835,8 +842,10 @@
                 leaderboardCard.classList.add('hidden');
                 playerModeBtn.classList.add('btn-primary');
                 playerModeBtn.classList.remove('btn-secondary');
-                playerModeBtnBottom.classList.add('btn-primary');
-                playerModeBtnBottom.classList.remove('btn-secondary');
+                if (playerModeBtnBottom) {
+                    playerModeBtnBottom.classList.add('btn-primary');
+                    playerModeBtnBottom.classList.remove('btn-secondary');
+                }
                 organizerModeBtnBottom.classList.add('btn-secondary');
                 organizerModeBtnBottom.classList.remove('btn-primary');
                 if (currentTournamentId) {
@@ -985,6 +994,7 @@
             if (!course || !course.pars) return; // Warten, bis Platzdaten geladen sind
             const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
             players.forEach((player) => {
+                if(!player || !player.handicap) return;
                 const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
                 player.playingHandicap = playingHandicap;
                 const row = playersTableBody.insertRow();
@@ -1004,6 +1014,7 @@
         function renderScoresInput() {
             scoresTableBody.innerHTML = '';
             players.forEach(player => {
+                if(!player || !player.id) return;
                 const row = scoresTableBody.insertRow();
                 row.innerHTML = `<td>${player.name}</td>`;
                 for (let i = 1; i <= 18; i++) {
@@ -1164,14 +1175,15 @@
         function calculateAndRenderLeaderboard() {
             const leaderboardData = [];
             if (!course || !course.pars) return;
-            const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
 
             players.forEach(player => {
+                if(!player || !player.handicap) return;
                 let totalStablefordPoints = 0;
                 let totalStrokes = 0;
                 let playedHoles = 0;
                 let playedPar = 0;
                 let playerScores = scores[player.id] || {};
+                const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
                 const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
 
                 for (let i = 1; i <= 18; i++) {
@@ -1354,18 +1366,41 @@
          * Lädt die Liste der gespeicherten Turniere und füllt das Dropdown.
          */
         async function loadTournamentList() {
-            if(!tournamentsCollectionRef) return;
+            if (!tournamentsCollectionRef) return;
+
+            // 1. Holen Sie sich die Quell-ID des aktuellen Live-Turniers
+            const liveTournamentRef = doc(tournamentsCollectionRef, 'live_tournament');
+            const liveTournamentSnap = await getDoc(liveTournamentRef);
+            let liveSourceId = null;
+            if (liveTournamentSnap.exists()) {
+                const liveData = liveTournamentSnap.data();
+                if (liveData && liveData.sourceId) {
+                    liveSourceId = liveData.sourceId;
+                }
+            }
+
             const querySnapshot = await getDocs(tournamentsCollectionRef);
             loadTournamentSelect.innerHTML = '';
+
             querySnapshot.forEach(doc => {
-                 const option = document.createElement('option');
-                 option.value = doc.id;
-                 let tournamentName = doc.data().course.tournamentName || doc.id;
-                 if (doc.id === currentTournamentId) {
-                     tournamentName += " (live)";
-                 }
-                 option.textContent = tournamentName;
-                 loadTournamentSelect.appendChild(option);
+                // 2. Überspringen Sie das Dokument 'live_tournament' selbst in der Liste
+                if (doc.id === 'live_tournament') {
+                    return;
+                }
+
+                const option = document.createElement('option');
+                option.value = doc.id;
+                const tournamentData = doc.data();
+                const tournamentName = (tournamentData.course && tournamentData.course.tournamentName) ? tournamentData.course.tournamentName : doc.id;
+
+                // 3. Markieren Sie das aktuell laufende Turnier
+                if (doc.id === liveSourceId) {
+                    option.textContent = `[LIVE] ${tournamentName}`;
+                    option.selected = true; // Wählen Sie es in der Dropdown-Liste aus
+                } else {
+                    option.textContent = tournamentName;
+                }
+                loadTournamentSelect.appendChild(option);
             });
         }
 
@@ -1442,7 +1477,9 @@
         messageBoxOverlay.addEventListener('click', hideMessageBox);
         organizerModeBtnBottom.addEventListener('click', () => switchMode('organizer'));
         playerModeBtn.addEventListener('click', () => switchMode('player'));
-        playerModeBtnBottom.addEventListener('click', () => switchMode('player'));
+        if (playerModeBtnBottom) {
+            playerModeBtnBottom.addEventListener('click', () => switchMode('player'));
+        }
 
 
         playerLoginBtn.addEventListener('click', () => {
@@ -1493,12 +1530,14 @@
 
             const leaderboardData = [];
             if (!course.pars) return;
-            const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
 
             players.forEach(player => {
                 let totalStablefordPoints = 0;
                 let totalStrokes = 0;
+                let playedHoles = 0;
+                let playedPar = 0;
                 let playerScores = scores[player.id] || {};
+                const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
                 const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
 
                 for (let i = 1; i <= 18; i++) {
@@ -1506,11 +1545,14 @@
                     if (!isNaN(grossScore) && grossScore > 0) {
                         totalStablefordPoints += calculateStablefordPoints(grossScore, course.pars[i - 1], playingHandicap, course.hcpIndices[i - 1]);
                         totalStrokes += grossScore;
+                        playedHoles++;
+                        playedPar += course.pars[i - 1];
                     }
                 }
 
-                const brutto = totalStrokes > 0 ? totalStrokes - totalPar : null;
-                const netto = totalStrokes > 0 ? brutto - playingHandicap : null;
+                const proportionalHandicap = Math.round(playingHandicap * (playedHoles / 18));
+                const brutto = totalStrokes > 0 ? totalStrokes - playedPar : null;
+                const netto = totalStrokes > 0 ? brutto - proportionalHandicap : null;
 
                 leaderboardData.push({
                     name: player.name,
@@ -1808,9 +1850,19 @@
                     console.warn(`Tournament with ID "${tournamentId}" does not exist.`);
                     currentTournamentId = null;
                     localStorage.removeItem('golfStablefordCurrentTournamentId');
-                    showMessageBox("Fehler", "Das geladene Turnier existiert nicht mehr. Bitte wählen Sie ein anderes in der Turnierverwaltung.", () => {
-                        showTournamentAdminModal();
-                    });
+                    // Clear local data to reflect the empty state
+                    course = {};
+                    players = [];
+                    scores = {};
+                    settings = { isScoreEntryLocked: false, isLiveScoreVisible: true };
+
+                    // Update UI elements to show that no tournament is active
+                    updateUIWithNewData();
+                    updatePageTitles();
+                    playerWelcomeMessage.textContent = "Aktuell ist kein Turnier live.";
+
+                    // Show a player-friendly message without opening the admin modal
+                    showMessageBox("Hinweis", "Aktuell ist kein Turnier live. Bitte warte, bis der Organisator ein Turnier startet.");
                 }
             }, (error) => console.error("Error listening to tournament data:", error));
         }
@@ -1931,7 +1983,8 @@
                     const liveTournamentRef = doc(tournamentsCollectionRef, 'live_tournament');
                     await setDoc(liveTournamentRef, {
                         course: dataToLoad.course,
-                        settings: dataToLoad.settings || { isScoreEntryLocked: false, isLiveScoreVisible: true }
+                        settings: dataToLoad.settings || { isScoreEntryLocked: false, isLiveScoreVisible: true },
+                        sourceId: tournamentIdToLoad // Speichern, welches Turnier die Quelle ist
                     });
 
                     // Spieler-Subcollection kopieren
@@ -1968,10 +2021,20 @@
                     showMessageBox("Fehler", "Bitte wählen Sie ein Turnier zum Löschen aus.");
                     return;
                 }
-                if (selectedTournamentId === 'live_tournament') {
-                    showMessageBox("Fehler", "Das Live-Turnier kann nicht direkt gelöscht werden. Laden Sie zuerst ein anderes Turnier.");
+
+                // Prüfen, ob das ausgewählte Turnier die Quelle des aktuellen Live-Turniers ist
+                const liveTournamentRef = doc(tournamentsCollectionRef, 'live_tournament');
+                const liveTournamentSnap = await getDoc(liveTournamentRef);
+                let liveSourceId = null;
+                if (liveTournamentSnap.exists() && liveTournamentSnap.data().sourceId) {
+                    liveSourceId = liveTournamentSnap.data().sourceId;
+                }
+
+                if (selectedTournamentId === liveSourceId) {
+                    showMessageBox("Fehler", "Dieses Turnier ist aktuell live. Bitte laden Sie zuerst ein anderes Turnier, bevor Sie dieses löschen.");
                     return;
                 }
+
                 showMessageBox("Bestätigung", `Möchten Sie das Turnier "${loadTournamentSelect.options[loadTournamentSelect.selectedIndex].text}" wirklich unwiderruflich löschen?`, async () => {
                     // Sub-Collection löschen
                      const playersCollectionRef = collection(db, `/artifacts/${appId}/public/data/tournaments/${selectedTournamentId}/players`);
@@ -1984,6 +2047,40 @@
                     await deleteDoc(doc(tournamentsCollectionRef, selectedTournamentId));
                     showMessageBox("Erfolg", "Turnier wurde gelöscht.");
                     loadTournamentList();
+                });
+            });
+
+            unloadTournamentBtn.addEventListener('click', () => {
+                showMessageBox("Bestätigung", "Möchten Sie das Live-Turnier wirklich beenden? Die Spieler-App wird zurückgesetzt und es ist kein Turnier mehr aktiv.", async () => {
+                    try {
+                        const liveTournamentRef = doc(tournamentsCollectionRef, 'live_tournament');
+
+                        const liveDoc = await getDoc(liveTournamentRef);
+                        if (!liveDoc.exists()) {
+                            showMessageBox("Info", "Es ist bereits kein Turnier live.", () => location.reload());
+                            return;
+                        }
+
+                        // Spieler-Subcollection löschen
+                        const livePlayersRef = collection(liveTournamentRef, 'players');
+                        const livePlayerDocs = await getDocs(livePlayersRef);
+                        const deleteBatch = writeBatch(db);
+                        livePlayerDocs.forEach(d => deleteBatch.delete(d.ref));
+                        await deleteBatch.commit();
+
+                        // Das Live-Turnier-Dokument löschen
+                        await deleteDoc(liveTournamentRef);
+
+                        localStorage.removeItem('golfStablefordCurrentTournamentId');
+
+                        showMessageBox("Erfolg", "Das Live-Turnier wurde beendet. Die App wird neu geladen.", () => {
+                            location.reload();
+                        });
+
+                    } catch (error) {
+                        console.error("Error unloading tournament:", error);
+                        showMessageBox("Fehler", "Das Live-Turnier konnte nicht beendet werden.");
+                    }
                 });
             });
 
