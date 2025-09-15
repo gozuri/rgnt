@@ -422,7 +422,7 @@
                         <input type="text" id="playerName" class="input-field" placeholder="Max Mustermann">
                     </div>
                     <div class="input-group">
-                        <label for="playerHandicap">Handicap Index (HCI):</label>
+                        <label for="playerHandicap">Playing Handicap (PHC):</label>
                         <input type="number" step="0.1" id="playerHandicap" class="input-field" value="18.0" min="0" max="54">
                     </div>
                 </div>
@@ -434,8 +434,8 @@
                         <thead>
                             <tr>
                                 <th>Name</th>
-                                <th>HCI</th>
-                                <th>Spielvorgabe</th>
+                                <th>PHC</th>
+                                <th>EHC</th>
                                 <th>Aktionen</th>
                             </tr>
                         </thead>
@@ -994,17 +994,31 @@
             if (!course || !course.pars) return; // Warten, bis Platzdaten geladen sind
             const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
             players.forEach((player) => {
-                if(!player || !player.handicap) return;
+                if(!player || player.handicap === undefined) return;
                 const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
                 player.playingHandicap = playingHandicap;
                 const row = playersTableBody.insertRow();
                 row.innerHTML = `
                     <td>${player.name}</td>
-                    <td>${player.handicap.toFixed(1)}</td>
+                    <td><input type="number" step="0.1" value="${player.handicap.toFixed(1)}" class="score-input w-20" data-player-id="${player.id}"></td>
                     <td>${player.playingHandicap}</td>
                     <td><button class="btn btn-danger btn-sm" data-player-id="${player.id}">Entfernen</button></td>
                 `;
                 row.querySelector('button').addEventListener('click', (e) => removePlayer(e.target.dataset.playerId));
+                const handicapInput = row.querySelector('input[type="number"]');
+                handicapInput.addEventListener('change', (e) => {
+                    const playerId = e.target.dataset.playerId;
+                    const newHandicap = parseFloat(e.target.value);
+                    if (!isNaN(newHandicap) && newHandicap >= 0 && newHandicap <= 54) {
+                        updatePlayerHandicapInDB(playerId, newHandicap);
+                    } else {
+                        showMessageBox("Fehler", "Bitte geben Sie einen gültigen Handicap Index (0.0-54.0) ein.");
+                        const oldPlayer = players.find(p => p.id === playerId);
+                        if (oldPlayer) {
+                            e.target.value = oldPlayer.handicap.toFixed(1);
+                        }
+                    }
+                });
             });
         }
 
@@ -1276,6 +1290,32 @@
         // ===================================================================================
 
         /**
+         * Updates a player's handicap in both live and source tournaments.
+         * @param {string} playerId - The ID of the player to update.
+         * @param {number} newHandicap - The new handicap value.
+         */
+        async function updatePlayerHandicapInDB(playerId, newHandicap) {
+            if (!authReady || !tournamentDocRef || isNaN(newHandicap)) return;
+
+            try {
+                // Write to live tournament for real-time updates
+                const livePlayerDocRef = doc(collection(tournamentDocRef, 'players'), playerId);
+                await setDoc(livePlayerDocRef, { handicap: newHandicap }, { merge: true });
+
+                // Write to source tournament for persistence
+                if (currentTournamentSourceId) {
+                    const sourceTournamentRef = doc(tournamentsCollectionRef, currentTournamentSourceId);
+                    const sourcePlayerDocRef = doc(collection(sourceTournamentRef, 'players'), playerId);
+                    await setDoc(sourcePlayerDocRef, { handicap: newHandicap }, { merge: true });
+                }
+            } catch (error) {
+                console.error("Handicap update failed:", error);
+                showMessageBox("Fehler", "Das Handicap konnte nicht aktualisiert werden.");
+            }
+        }
+
+
+        /**
          * Speichert die aktuellen Platzdaten in Firestore.
          */
         async function updateCourseData() {
@@ -1297,9 +1337,15 @@
          */
         async function addPlayerToDB(player) {
             if (!authReady || !tournamentDocRef) return;
-            const playersCollectionRef = collection(tournamentDocRef, 'players');
-            const newPlayerDocRef = doc(playersCollectionRef, player.id);
-            await setDoc(newPlayerDocRef, player);
+            const livePlayersCollectionRef = collection(tournamentDocRef, 'players');
+            const newLivePlayerDocRef = doc(livePlayersCollectionRef, player.id);
+            await setDoc(newLivePlayerDocRef, player);
+
+            if(currentTournamentSourceId) {
+                const sourcePlayersCollectionRef = collection(db, `/artifacts/${appId}/public/data/tournaments/${currentTournamentSourceId}/players`);
+                const newSourcePlayerDocRef = doc(sourcePlayersCollectionRef, player.id);
+                await setDoc(newSourcePlayerDocRef, player);
+            }
         }
 
         /**
@@ -1310,6 +1356,12 @@
             if (!authReady || !tournamentDocRef) return;
             const playerDocRef = doc(collection(tournamentDocRef, 'players'), playerId);
             await deleteDoc(playerDocRef);
+
+            if(currentTournamentSourceId) {
+                const sourcePlayersCollectionRef = collection(db, `/artifacts/${appId}/public/data/tournaments/${currentTournamentSourceId}/players`);
+                const sourcePlayerDocRef = doc(sourcePlayersCollectionRef, playerId);
+                await deleteDoc(sourcePlayerDocRef);
+            }
         }
 
         /**
@@ -1376,22 +1428,11 @@
         async function loadTournamentList() {
             if (!tournamentsCollectionRef) return;
 
-            // 1. Holen Sie sich die Quell-ID des aktuellen Live-Turniers
-            const liveTournamentRef = doc(tournamentsCollectionRef, 'live_tournament');
-            const liveTournamentSnap = await getDoc(liveTournamentRef);
-            let liveSourceId = null;
-            if (liveTournamentSnap.exists()) {
-                const liveData = liveTournamentSnap.data();
-                if (liveData && liveData.sourceId) {
-                    liveSourceId = liveData.sourceId;
-                }
-            }
-
             const querySnapshot = await getDocs(tournamentsCollectionRef);
             loadTournamentSelect.innerHTML = '';
 
             querySnapshot.forEach(doc => {
-                // 2. Überspringen Sie das Dokument 'live_tournament' selbst in der Liste
+                // Überspringen Sie das Dokument 'live_tournament' selbst in der Liste
                 if (doc.id === 'live_tournament') {
                     return;
                 }
@@ -1401,8 +1442,8 @@
                 const tournamentData = doc.data();
                 const tournamentName = (tournamentData.course && tournamentData.course.tournamentName) ? tournamentData.course.tournamentName : doc.id;
 
-                // 3. Markieren Sie das aktuell laufende Turnier
-                if (doc.id === liveSourceId) {
+                // Markieren Sie das aktuell laufende Turnier
+                if (doc.id === currentTournamentSourceId) {
                     option.textContent = `[LIVE] ${tournamentName}`;
                     option.selected = true; // Wählen Sie es in der Dropdown-Liste aus
                 } else {
@@ -1459,6 +1500,11 @@
                     course.pars = newPars;
                     course.hcpIndices = newHcpIndices;
                     await updateCourseData();
+
+                    if(currentTournamentSourceId) {
+                         const sourceTournamentRef = doc(tournamentsCollectionRef, currentTournamentSourceId);
+                         await setDoc(sourceTournamentRef, { course: course }, { merge: true });
+                    }
                     showMessageBox("Erfolgreich", "Platz-Einstellungen gespeichert!");
                 }
             }
@@ -2044,15 +2090,7 @@
                     return;
                 }
 
-                // Prüfen, ob das ausgewählte Turnier die Quelle des aktuellen Live-Turniers ist
-                const liveTournamentRef = doc(tournamentsCollectionRef, 'live_tournament');
-                const liveTournamentSnap = await getDoc(liveTournamentRef);
-                let liveSourceId = null;
-                if (liveTournamentSnap.exists() && liveTournamentSnap.data().sourceId) {
-                    liveSourceId = liveTournamentSnap.data().sourceId;
-                }
-
-                if (selectedTournamentId === liveSourceId) {
+                if (selectedTournamentId === currentTournamentSourceId) {
                     showMessageBox("Fehler", "Dieses Turnier ist aktuell live. Bitte laden Sie zuerst ein anderes Turnier, bevor Sie dieses löschen.");
                     return;
                 }
@@ -2110,3 +2148,4 @@
     </script>
 </body>
 </html>
+```
