@@ -577,6 +577,7 @@
         let tournamentDocRef; // Referenz zum aktuell geladenen Turnier-Dokument
         let activeTournamentStateRef;
         let currentTournamentId = null; // ID des aktuellen Turniers
+        let currentTournamentSourceId = null; // ID of the source for the live tournament
         let course = {}; // Speichert die aktuellen Platzdaten (CR, SR, Pars etc.)
         let players = []; // Array aller Spieler
         let scores = {}; // Objekt, das die Scores aller Spieler speichert { playerId: { hole1: score, ... } }
@@ -1345,8 +1346,17 @@
             }
 
             try {
-                const playerDocRef = doc(collection(tournamentDocRef, 'players'), activePlayerId);
-                await setDoc(playerDocRef, { scores: scoresToSave }, { merge: true });
+                // Write to live tournament for real-time updates
+                const livePlayerDocRef = doc(collection(tournamentDocRef, 'players'), activePlayerId);
+                await setDoc(livePlayerDocRef, { scores: scoresToSave }, { merge: true });
+
+                // Write to source tournament for persistence
+                if (currentTournamentSourceId) {
+                    const sourceTournamentRef = doc(tournamentsCollectionRef, currentTournamentSourceId);
+                    const sourcePlayerDocRef = doc(collection(sourceTournamentRef, 'players'), activePlayerId);
+                    await setDoc(sourcePlayerDocRef, { scores: scoresToSave }, { merge: true });
+                }
+
                 if (showPopup) {
                     showMessageBox("Erfolg", `Dein Score wurde erfolgreich synchronisiert!`);
                 }
@@ -1495,7 +1505,14 @@
                 return;
             }
 
-            const batch = writeBatch(db);
+            const liveBatch = writeBatch(db);
+            const sourceBatch = writeBatch(db);
+
+            let sourceTournamentRef = null;
+            if (currentTournamentSourceId) {
+                sourceTournamentRef = doc(tournamentsCollectionRef, currentTournamentSourceId);
+            }
+
             players.forEach((player) => {
                 const playerDocRef = doc(collection(tournamentDocRef, 'players'), player.id);
                 const scoresToUpdate = {};
@@ -1505,9 +1522,17 @@
                         scoresToUpdate[`hole${i}`] = input.value === '' ? null : parseInt(input.value);
                     }
                 }
-                batch.set(playerDocRef, { scores: scoresToUpdate }, { merge: true });
+                liveBatch.set(playerDocRef, { scores: scoresToUpdate }, { merge: true });
+
+                if (sourceTournamentRef) {
+                    const sourcePlayerDocRef = doc(collection(sourceTournamentRef, 'players'), player.id);
+                    sourceBatch.set(sourcePlayerDocRef, { scores: scoresToUpdate }, { merge: true });
+                }
             });
-            await batch.commit();
+            await liveBatch.commit();
+            if(sourceTournamentRef) {
+                await sourceBatch.commit();
+            }
             showMessageBox("Erfolg", "Rangliste aktualisiert.");
         });
 
@@ -1804,6 +1829,7 @@
                     const data = docSnap.data();
                     course = data.course || {};
                     settings = data.settings || { isScoreEntryLocked: false, isLiveScoreVisible: true };
+                    currentTournamentSourceId = data.sourceId || null;
 
                     tournamentNameInput.value = course.tournamentName || '';
                     courseNameInput.value = course.courseName || '';
