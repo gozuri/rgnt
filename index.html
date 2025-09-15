@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>8105 Tour 2025</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,6 +13,7 @@
             background-color: #f0f4f8; /* Light blue-gray background */
             color: #333;
             line-height: 1.6;
+            touch-action: manipulation; /* Verhindert Zoom bei Doppelklick auf mobilen Geräten */
         }
         .container {
             max-width: 900px;
@@ -526,7 +527,7 @@
         </div> <!-- End of playerContent -->
 
         <!-- Rangliste (in beiden Modi sichtbar, aber Reset nur für Organisator) -->
-        <div class="card" id="leaderboardCard">
+        <div class="card hidden" id="leaderboardCard">
             <h2 class="text-xl font-semibold mb-4 text-gray-700">4. Rangliste</h2>
             <div class="table-container">
                 <table id="leaderboardTable" class="leaderboard-table">
@@ -850,7 +851,7 @@
                 organizerModeBtnBottom.classList.remove('btn-primary');
                 if (currentTournamentId) {
                     populatePlayerSelect();
-                    playerWelcomeMessage.textContent = "Bitte wählen Sie Deinen Namen und melden Sie sich an.";
+                    playerWelcomeMessage.textContent = "Bitte wählen Deinen Namen und melden dich an.";
                     document.getElementById('playerScoresTableBody').innerHTML = '';
                     playerSaveScoresBtn.disabled = true;
                     syncScoresBtn.disabled = true;
