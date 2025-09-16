@@ -278,7 +278,7 @@
                 </div>
                  <div id="playerInfoBox" class="hidden mt-2">
                     <p id="playerNameInfo" class="font-bold text-blue-600"></p>
-                    <p id="playerEhcInfo" class="text-sm text-gray-500"></p>
+                    <p id="playerEHCInfo" class="text-sm text-gray-500"></p>
                 </div>
             </div>
             <button id="playerModeBtn" class="btn btn-primary flex-shrink-0">Spieler-Modus</button>
@@ -653,7 +653,7 @@
         const courseNameInfo = document.getElementById('courseNameInfo');
         const courseRatingsInfo = document.getElementById('courseRatingsInfo');
         const playerNameInfo = document.getElementById('playerNameInfo');
-        const playerEhcInfo = document.getElementById('playerEhcInfo');
+        const playerEHCInfo = document.getElementById('playerEHCInfo');
 
         // Turnierverwaltung
         const tournamentAdminBtn = document.getElementById('tournamentAdminBtn');
@@ -699,7 +699,7 @@
                      const totalPar = course.pars.reduce((sum, p) => sum + p, 0);
                      const playingHandicap = calculatePlayingHandicap(player.handicap, course.courseRating, course.slopeRating, totalPar);
                      playerNameInfo.textContent = player.name;
-                     playerEhcInfo.textContent = `PHC: ${player.handicap.toFixed(1)} / EHC: ${playingHandicap}`;
+                     playerEHCInfo.textContent = `PHC: ${player.handicap.toFixed(1)} / EHC: ${playingHandicap}`;
                      playerInfoBox.classList.remove('hidden');
                 }
             } else {
@@ -961,12 +961,12 @@
          * @param {number} grossScore - Der Brutto-Score des Spielers für das Loch.
          * @param {number} holePar - Das Par des Lochs.
          * @param {number} playingHandicap - Die Spielvorgabe des Spielers.
-         * @param {number} holeHcpIndex - Der Handicap-Index des Lochs.
+         * @param {number} holEHCpIndex - Der Handicap-Index des Lochs.
          * @returns {number} Die erzielten Stableford-Punkte.
          */
-        function calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex) {
+        function calculateStablefordPoints(grossScore, holePar, playingHandicap, holEHCpIndex) {
             if (isNaN(grossScore) || grossScore <= 0) return 0; // Null oder weniger zählt nicht
-            const netStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
+            const netStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holEHCpIndex);
             const netParForHole = holePar + netStrokesForHole;
             return Math.max(0, 2 + (netParForHole - grossScore));
         }
@@ -1077,8 +1077,8 @@
 
             for (let i = 1; i <= 18; i++) {
                 const holePar = course.pars[i - 1];
-                const holeHcpIndex = course.hcpIndices[i - 1];
-                const handicapStrokes = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
+                const holEHCpIndex = course.hcpIndices[i - 1];
+                const handicapStrokes = getHandicapStrokesPerHole(playingHandicap, holEHCpIndex);
 
                 const row = tableBody.insertRow();
                 row.className = 'text-center bg-white border-b hover:bg-gray-50';
@@ -1216,8 +1216,8 @@
                 leaderboardData.push({
                     name: player.name,
                     totalPoints: totalStablefordPoints,
-                    phc: player.handicap,
-                    ehc: playingHandicap,
+                    PHC: player.handicap,
+                    EHC: playingHandicap,
                     strokes: totalStrokes > 0 ? totalStrokes : '-',
                     brutto: brutto !== null ? formatScoreToPar(brutto) : '-',
                     netto: netto !== null ? formatScoreToPar(netto) : '-',
@@ -1239,8 +1239,8 @@
                     <td>${player.rank}.</td>
                     <td class="text-left">${player.name}</td>
                     <td>${player.totalPoints}</td>
-                    <td>${player.phc.toFixed(1)}</td>
-                    <td>${player.ehc}</td>
+                    <td>${player.PHC.toFixed(1)}</td>
+                    <td>${player.EHC}</td>
                     <td>${player.strokes}</td>
                     <td>${player.brutto}</td>
                     <td>${player.netto}</td>
@@ -1271,7 +1271,7 @@
         /**
          * Validiert die HCP-Index-Eingaben in Echtzeit und markiert Duplikate.
          */
-        function validateHcpInputs() {
+        function validatEHCpInputs() {
             const hcpInputs = document.querySelectorAll('#courseDetailsTable input[id^="hcpIndex"]');
             const values = Array.from(hcpInputs).map(input => input.value);
             const duplicates = values.filter((item, index) => values.indexOf(item) !== index && item !== '');
@@ -1492,8 +1492,8 @@
                 }
             }
             if (isValid) {
-                const uniqueHcpIndices = new Set(newHcpIndices.filter(v => v));
-                if (uniqueHcpIndices.size !== newHcpIndices.filter(v=>v).length) {
+                const uniquEHCpIndices = new Set(newHcpIndices.filter(v => v));
+                if (uniquEHCpIndices.size !== newHcpIndices.filter(v=>v).length) {
                     showMessageBox("Fehler", "Die HCP Indices müssen einzigartig sein.");
                     isValid = false;
                 } else {
@@ -1621,8 +1621,8 @@
                 leaderboardData.push({
                     name: player.name,
                     totalPoints: totalStablefordPoints,
-                    phc: player.handicap,
-                    ehc: playingHandicap,
+                    PHC: player.handicap,
+                    EHC: playingHandicap,
                     strokes: totalStrokes > 0 ? totalStrokes : '-',
                     brutto: brutto !== null ? formatScoreToPar(brutto) : '-',
                     netto: netto !== null ? formatScoreToPar(netto) : '-',
@@ -1661,8 +1661,8 @@
                         <td class="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">${player.rank}.</td>
                         <td class="px-3 py-2 text-left">${player.name}</td>
                         <td class="px-3 py-2 font-bold">${player.totalPoints}</td>
-                        <td class="px-3 py-2">${player.phc.toFixed(1)}</td>
-                        <td class="px-3 py-2">${player.ehc}</td>
+                        <td class="px-3 py-2">${player.PHC.toFixed(1)}</td>
+                        <td class="px-3 py-2">${player.EHC}</td>
                         <td class="px-3 py-2">${player.strokes}</td>
                         <td class="px-3 py-2">${player.brutto}</td>
                         <td class="px-3 py-2">${player.netto}</td>
@@ -1730,16 +1730,16 @@
 
             for (let i = 1; i <= 18; i++) {
                 const holePar = course.pars[i - 1];
-                const holeHcpIndex = course.hcpIndices[i - 1];
+                const holEHCpIndex = course.hcpIndices[i - 1];
                 const scoreValue = scoresToSave[`hole${i}`];
                 const grossScore = (scoreValue !== null && scoreValue !== undefined) ? parseInt(scoreValue) : NaN;
 
                 let stablefordPoints = 0;
                 if (!isNaN(grossScore) && grossScore > 0) {
-                    stablefordPoints = calculateStablefordPoints(grossScore, holePar, playingHandicap, holeHcpIndex);
+                    stablefordPoints = calculateStablefordPoints(grossScore, holePar, playingHandicap, holEHCpIndex);
                 }
 
-                const handicapStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holeHcpIndex);
+                const handicapStrokesForHole = getHandicapStrokesPerHole(playingHandicap, holEHCpIndex);
 
                 // Zu den Summen addieren
                 if (i <= 9) {
@@ -1975,7 +1975,7 @@
             for (let i = 1; i <= 18; i++) {
                 const hcpInput = document.getElementById(`hcpIndex${i}`);
                 if(hcpInput) {
-                    hcpInput.addEventListener('input', validateHcpInputs);
+                    hcpInput.addEventListener('input', validatEHCpInputs);
                 }
             }
 
